@@ -1,4 +1,8 @@
 use {
+    anchor_lang::{
+        prelude::*,
+        solana_program::{self, program_option::COption},
+    },
     borsh::{BorshDeserialize, BorshSerialize},
     solana_program::{
         instruction::{AccountMeta, Instruction},
@@ -6,8 +10,10 @@ use {
         sysvar,
     },
     spl_token,
-    spl_token_metadata::{instruction::{update_metadata_accounts, CreateMetadataAccountArgs, MetadataInstruction}, state::{Metadata, Data, Creator}},
-    anchor_lang::{prelude::*, solana_program::{self, program_option::COption}}
+    spl_token_metadata::{
+        instruction::{update_metadata_accounts, CreateMetadataAccountArgs, MetadataInstruction},
+        state::{Creator, Data, Metadata},
+    },
 };
 
 pub fn main() {
@@ -25,19 +31,19 @@ pub fn create_metadata<'a, 'b, 'c, 'info>(
     is_mutable: bool,
 ) -> ProgramResult {
     let ix = create_metadata_accounts(
-        *ctx.accounts.token_metadata_program.key, 
-        *ctx.accounts.metadata.key, 
-        ctx.accounts.mint.key(), 
-        ctx.accounts.mint_authority.key(), 
-        ctx.accounts.payer.key(), 
+        *ctx.accounts.token_metadata_program.key,
+        *ctx.accounts.metadata.key,
+        ctx.accounts.mint.key(),
+        ctx.accounts.mint_authority.key(),
+        ctx.accounts.payer.key(),
         ctx.accounts.update_authority.key(),
         name,
-        symbol, 
-        uri, 
-        creators, 
-        seller_fee_basis_points, 
-        update_authority_is_signer, 
-        is_mutable
+        symbol,
+        uri,
+        creators,
+        seller_fee_basis_points,
+        update_authority_is_signer,
+        is_mutable,
     );
     solana_program::program::invoke_signed(
         &ix,
@@ -46,11 +52,11 @@ pub fn create_metadata<'a, 'b, 'c, 'info>(
             ctx.accounts.mint.to_account_info(),
             ctx.accounts.mint_authority.to_account_info(),
             ctx.accounts.payer.to_account_info(),
-            ctx.accounts.update_authority.to_account_info(), 
+            ctx.accounts.update_authority.to_account_info(),
             ctx.accounts.system_program.to_account_info(),
             ctx.accounts.rent.to_account_info(),
         ],
-        ctx.signer_seeds
+        ctx.signer_seeds,
     )?;
     Ok(())
 }
@@ -59,9 +65,9 @@ pub fn create_metadata<'a, 'b, 'c, 'info>(
 #[derive(Accounts)]
 pub struct CreateMetadata<'info> {
     pub metadata: AccountInfo<'info>, //Metadata key (pda of ['metadata', program id, mint id])
-    pub mint: AccountInfo<'info>, //mint of the token we are creating metadata for
+    pub mint: AccountInfo<'info>,     //mint of the token we are creating metadata for
     pub mint_authority: AccountInfo<'info>,
-    pub payer: Signer<'info>, 
+    pub payer: Signer<'info>,
     pub update_authority: AccountInfo<'info>, //this is the account that will have future ability to update the newly created metadata
     #[account(address = spl_token_metadata::id())]
     pub token_metadata_program: AccountInfo<'info>,
@@ -70,7 +76,7 @@ pub struct CreateMetadata<'info> {
 }
 
 #[derive(Accounts)]
-pub struct UpdateMetadata<'info> {
+pub struct UpdateMetadataAccount<'info> {
     #[account(mut)]
     pub metadata: AccountInfo<'info>,
     pub update_authority: AccountInfo<'info>,
@@ -79,30 +85,26 @@ pub struct UpdateMetadata<'info> {
 }
 
 pub fn update_metadata<'a, 'b, 'c, 'info>(
-    ctx: CpiContext<'a, 'b, 'c, 'info, UpdateMetadata<'info>>,
+    ctx: CpiContext<'a, 'b, 'c, 'info, UpdateMetadataAccount<'info>>,
     new_update_authority: Option<Pubkey>,
     data: Option<Data>,
-    primary_sale_happened: Option<bool>
+    primary_sale_happened: Option<bool>,
 ) -> ProgramResult {
     let ix = update_metadata_accounts(
-        ctx.accounts.token_metadata_program.key(), 
-        ctx.accounts.metadata.key(), 
-        ctx.accounts.update_authority.key(), 
-        new_update_authority, 
-        data, 
-        primary_sale_happened
+        ctx.accounts.token_metadata_program.key(),
+        ctx.accounts.metadata.key(),
+        ctx.accounts.update_authority.key(),
+        new_update_authority,
+        data,
+        primary_sale_happened,
     );
     solana_program::program::invoke_signed(
-        &ix, 
-        &[
-            ctx.accounts.metadata,
-            ctx.accounts.update_authority,
-        ], 
-        ctx.signer_seeds
+        &ix,
+        &[ctx.accounts.metadata, ctx.accounts.update_authority],
+        ctx.signer_seeds,
     )?;
     Ok(())
 }
-
 
 #[allow(clippy::too_many_arguments)]
 pub fn create_metadata_accounts(
@@ -145,6 +147,3 @@ pub fn create_metadata_accounts(
         .unwrap(),
     }
 }
-
-
-

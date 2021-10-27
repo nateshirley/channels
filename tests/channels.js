@@ -263,7 +263,7 @@ describe("channels", () => {
       uri: "https://nateshirley.github.io/data/default.json",
     };
 
-    const tx = await program.rpc.updateMetadata(_mintAuthBump, updateMetadataInputs, {
+    const tx = await program.rpc.updateChannelAndSubscriptionMetadata(_mintAuthBump, updateMetadataInputs, {
       accounts: {
         creator: creator.publicKey,
         channel: channel.publicKey,

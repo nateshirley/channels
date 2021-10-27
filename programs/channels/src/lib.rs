@@ -94,10 +94,10 @@ pub mod channels {
 
         Ok(())
     }
-    pub fn update_metadata(
+    pub fn update_channel_and_subscription_metadata(
         ctx: Context<UpdateChannelMetadata>,
         _mint_auth_bump: u8,
-        update_metadata_inputs: UpdateChannelMetadataInputs,
+        update_metadata_inputs: UpdateMetadataInputs,
     ) -> ProgramResult {
         let (_mint_auth, bump_seed) =
             Pubkey::find_program_address(&[MINT_AUTH_SEED], ctx.program_id);
@@ -119,6 +119,15 @@ pub mod channels {
         anchor_token_metadata::update_metadata(
             ctx.accounts
                 .into_update_channel_metadata_context()
+                .with_signer(&[&seeds[..]]),
+            None,
+            Some(new_data.clone()),
+            None,
+        )?;
+
+        anchor_token_metadata::update_metadata(
+            ctx.accounts
+                .into_update_subscription_metadata_context()
                 .with_signer(&[&seeds[..]]),
             None,
             Some(new_data),
@@ -227,7 +236,7 @@ pub struct Subscribe<'info> {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct UpdateChannelMetadataInputs {
+pub struct UpdateMetadataInputs {
     pub name: Option<String>,
     pub symbol: Option<String>,
     pub uri: Option<String>,
@@ -338,10 +347,21 @@ impl<'info> Subscribe<'info> {
 impl<'info> UpdateChannelMetadata<'info> {
     fn into_update_channel_metadata_context(
         &self,
-    ) -> CpiContext<'_, '_, '_, 'info, anchor_token_metadata::UpdateMetadata<'info>> {
+    ) -> CpiContext<'_, '_, '_, 'info, anchor_token_metadata::UpdateMetadataAccount<'info>> {
         let cpi_program = self.token_metadata_program.to_account_info();
-        let cpi_accounts = anchor_token_metadata::UpdateMetadata {
+        let cpi_accounts = anchor_token_metadata::UpdateMetadataAccount {
             metadata: self.channel_metadata.to_account_info(),
+            update_authority: self.mint_auth.to_account_info(),
+            token_metadata_program: self.token_metadata_program.to_account_info(),
+        };
+        CpiContext::new(cpi_program, cpi_accounts)
+    }
+    fn into_update_subscription_metadata_context(
+        &self,
+    ) -> CpiContext<'_, '_, '_, 'info, anchor_token_metadata::UpdateMetadataAccount<'info>> {
+        let cpi_program = self.token_metadata_program.to_account_info();
+        let cpi_accounts = anchor_token_metadata::UpdateMetadataAccount {
+            metadata: self.subscription_metadata.to_account_info(),
             update_authority: self.mint_auth.to_account_info(),
             token_metadata_program: self.token_metadata_program.to_account_info(),
         };
