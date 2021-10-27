@@ -97,6 +97,7 @@ pub mod channels {
     pub fn update_channel_and_subscription_metadata(
         ctx: Context<UpdateChannelMetadata>,
         _mint_auth_bump: u8,
+        _subscription_attribution_bump: u8,
         update_metadata_inputs: UpdateMetadataInputs,
     ) -> ProgramResult {
         let (_mint_auth, bump_seed) =
@@ -243,14 +244,14 @@ pub struct UpdateMetadataInputs {
 }
 
 #[derive(Accounts)]
-#[instruction(_mint_auth_bump: u8)]
+#[instruction(_mint_auth_bump: u8, _subscription_attribution_bump: u8)]
 pub struct UpdateChannelMetadata<'info> {
     pub creator: Signer<'info>,
     #[account(
         constraint = channel.supply == 1,
     )]
     pub channel: Account<'info, token::Mint>,
-    //makes sure the signer has the creator token in an account that they own
+    //the signer must own a creator token account with 1 token
     #[account(
         constraint = channel_token_account.mint == channel.key(),
         constraint = channel_token_account.owner == creator.key(),
@@ -260,8 +261,16 @@ pub struct UpdateChannelMetadata<'info> {
     //validated by metadata program
     #[account(mut)]
     pub channel_metadata: AccountInfo<'info>,
+    //need to make sure the susbcription goes with the mint
     pub subscription: Account<'info, token::Mint>,
-    //validated by metadata program
+    #[account(
+        seeds = [CHANNEL_SEED, subscription.key().as_ref()],
+        bump = _subscription_attribution_bump,
+        constraint = subscription_attribution.channel == channel.key(),
+        constraint = subscription_attribution.subscription == subscription.key(),
+    )]
+    pub subscription_attribution: Account<'info, Attribution>,
+    //validated by metadata program -- it will check that the metadata matches the mint  //https://github.com/metaplex-foundation/metaplex/blob/master/rust/token-metadata/program/src/utils.rs#L828
     #[account(mut)]
     pub subscription_metadata: AccountInfo<'info>,
     #[account(

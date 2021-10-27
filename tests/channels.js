@@ -253,6 +253,14 @@ describe("channels", () => {
     );
     let [_subscriptionMetadata, _subscriptionMetadataBump] =
       await getMetadataAddress(subscription.publicKey);
+    let [_subscriptionAttribution, _subscriptionAttributionBump] =
+      await PublicKey.findProgramAddress(
+        [
+          anchor.utils.bytes.utf8.encode("channel"),
+          subscription.publicKey.toBuffer(),
+        ],
+        program.programId
+      );
     let [_mintAuth, _mintAuthBump] = await PublicKey.findProgramAddress(
       [anchor.utils.bytes.utf8.encode("authority")],
       program.programId
@@ -263,13 +271,14 @@ describe("channels", () => {
       uri: "https://nateshirley.github.io/data/default.json",
     };
 
-    const tx = await program.rpc.updateChannelAndSubscriptionMetadata(_mintAuthBump, updateMetadataInputs, {
+    const tx = await program.rpc.updateChannelAndSubscriptionMetadata(_mintAuthBump, _subscriptionAttributionBump, updateMetadataInputs, {
       accounts: {
         creator: creator.publicKey,
         channel: channel.publicKey,
         channelTokenAccount: channelTokenAccount,
         channelMetadata: _channelMetadata,
         subscription: subscription.publicKey,
+        subscriptionAttribution: _subscriptionAttribution,
         subscriptionMetadata: _subscriptionMetadata,
         mintAuth: _mintAuth,
         systemProgram: SystemProgram.programId,
