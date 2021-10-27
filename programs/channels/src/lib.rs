@@ -1,11 +1,11 @@
 use anchor_lang::{
     prelude::*,
-    solana_program::{self, program_option::COption},
+    solana_program::{self, borsh::try_from_slice_unchecked, program_option::COption},
 };
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use anchor_token_metadata;
 use spl_token::instruction::AuthorityType;
-use spl_token_metadata::{instruction::update_metadata_accounts, state::Metadata};
+use spl_token_metadata::{self, instruction::update_metadata_accounts};
 
 declare_id!("WczqDK2L6bHkQVwrZuSmKFyUvgVTHtgE4zsGfQ1wmfi");
 const MINT_AUTH_SEED: &[u8] = b"authority";
@@ -19,7 +19,7 @@ pub mod channels {
         _channel_attribution_bump: u8,
         _subscription_attribution_bump: u8,
         _mint_auth_bump: u8,
-        metadata_inputs: MetadataInputs
+        metadata_inputs: MetadataInputs,
     ) -> ProgramResult {
         let (_mint_auth, bump_seed) =
             Pubkey::find_program_address(&[MINT_AUTH_SEED], ctx.program_id);
@@ -32,7 +32,7 @@ pub mod channels {
                 .with_signer(&[&seeds[..]]),
             1,
         )?;
-        let creators = vec![anchor_token_metadata::Creator {
+        let creators = vec![spl_token_metadata::state::Creator {
             address: ctx.accounts.mint_auth.key(),
             verified: true,
             share: 100,
@@ -48,7 +48,7 @@ pub mod channels {
             Some(creators.clone()),
             0,
             true,
-            false,
+            true,
         )?;
         //create subscription metadata
         anchor_token_metadata::create_metadata(
@@ -61,7 +61,7 @@ pub mod channels {
             Some(creators),
             0,
             true,
-            false,
+            true,
         )?;
 
         //set data for attribution pda's
@@ -94,10 +94,39 @@ pub mod channels {
 
         Ok(())
     }
-    pub fn update_metadata(ctx: Context<UpdateMetadata>, _mint_auth_bump: u8) -> ProgramResult {
+    pub fn update_metadata(
+        ctx: Context<UpdateChannelMetadata>,
+        _mint_auth_bump: u8,
+        update_metadata_inputs: UpdateChannelMetadataInputs,
+    ) -> ProgramResult {
+        let (_mint_auth, bump_seed) =
+            Pubkey::find_program_address(&[MINT_AUTH_SEED], ctx.program_id);
+        let seeds = &[&MINT_AUTH_SEED[..], &[bump_seed]];
+
+        let existing_metadata: spl_token_metadata::state::Metadata =
+            try_from_slice_unchecked(&ctx.accounts.channel_metadata.data.borrow()).unwrap();
+        let mut new_data: spl_token_metadata::state::Data = existing_metadata.data;
+        if let Some(name) = update_metadata_inputs.name {
+            new_data.name = name;
+        }
+        if let Some(symbol) = update_metadata_inputs.symbol {
+            new_data.symbol = symbol;
+        }
+        if let Some(uri) = update_metadata_inputs.uri {
+            new_data.uri = uri;
+        }
+
+        anchor_token_metadata::update_metadata(
+            ctx.accounts
+                .into_update_channel_metadata_context()
+                .with_signer(&[&seeds[..]]),
+            None,
+            Some(new_data),
+            None,
+        )?;
+
         Ok(())
     }
-
 }
 
 #[derive(Accounts)]
@@ -125,6 +154,7 @@ pub struct CreateChannel<'info> {
         payer = creator.to_account_info()
     )]
     pub channel_attribution: Account<'info, Attribution>,
+    //gets validated in the token metadata program
     #[account(mut)]
     pub channel_metadata: AccountInfo<'info>,
     #[account(
@@ -141,6 +171,7 @@ pub struct CreateChannel<'info> {
         payer = creator.to_account_info()
     )]
     pub subscription_attribution: Account<'info, Attribution>,
+    //gets validated in the token metadata program
     #[account(mut)]
     pub subscription_metadata: AccountInfo<'info>,
     #[account(
@@ -195,23 +226,35 @@ pub struct Subscribe<'info> {
     pub token_program: Program<'info, token::Token>,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct UpdateChannelMetadataInputs {
+    pub name: Option<String>,
+    pub symbol: Option<String>,
+    pub uri: Option<String>,
+}
+
 #[derive(Accounts)]
 #[instruction(_mint_auth_bump: u8)]
-pub struct UpdateMetadata<'info> {
+pub struct UpdateChannelMetadata<'info> {
     pub creator: Signer<'info>,
     #[account(
         constraint = channel.supply == 1,
     )]
     pub channel: Account<'info, token::Mint>,
-    //makes sure the signer has the creator token in an account they own
+    //makes sure the signer has the creator token in an account that they own
     #[account(
         constraint = channel_token_account.mint == channel.key(),
         constraint = channel_token_account.owner == creator.key(),
         constraint = channel_token_account.amount == 1,
     )]
     pub channel_token_account: Account<'info, token::TokenAccount>,
-    //pub channel_metadata: AccountInfo<'info>,
+    //validated by metadata program
+    #[account(mut)]
+    pub channel_metadata: AccountInfo<'info>,
     pub subscription: Account<'info, token::Mint>,
+    //validated by metadata program
+    #[account(mut)]
+    pub subscription_metadata: AccountInfo<'info>,
     #[account(
         seeds = [MINT_AUTH_SEED],
         bump = _mint_auth_bump,
@@ -220,7 +263,6 @@ pub struct UpdateMetadata<'info> {
     system_program: Program<'info, System>,
     #[account(address = spl_token_metadata::id())]
     token_metadata_program: AccountInfo<'info>,
-    //check that the metadata accounts belong to the mints
 }
 
 impl<'info> CreateChannel<'info> {
@@ -293,24 +335,32 @@ impl<'info> Subscribe<'info> {
     }
 }
 
-
-
-
-
-
+impl<'info> UpdateChannelMetadata<'info> {
+    fn into_update_channel_metadata_context(
+        &self,
+    ) -> CpiContext<'_, '_, '_, 'info, anchor_token_metadata::UpdateMetadata<'info>> {
+        let cpi_program = self.token_metadata_program.to_account_info();
+        let cpi_accounts = anchor_token_metadata::UpdateMetadata {
+            metadata: self.channel_metadata.to_account_info(),
+            update_authority: self.mint_auth.to_account_info(),
+            token_metadata_program: self.token_metadata_program.to_account_info(),
+        };
+        CpiContext::new(cpi_program, cpi_accounts)
+    }
+}
 
 /*
 
 
 
-      //ok so it worked when i passed in all the inputs but didn't call the metadata program.
-      //now it's not working when i pass in the inputs and also call the metadata program
-      //but it does work when don't pass any inputs and call the metadata program once (or even twice)
-      //ok so it works with the metadata and everything for one tx. that's only thing in the tx
-      //im thinking it must be a capacity issue bc it's doing fine
+//ok so it worked when i passed in all the inputs but didn't call the metadata program.
+//now it's not working when i pass in the inputs and also call the metadata program
+//but it does work when don't pass any inputs and call the metadata program once (or even twice)
+//ok so it works with the metadata and everything for one tx. that's only thing in the tx
+//im thinking it must be a capacity issue bc it's doing fine
 
 
 
 
-    
-      */
+
+*/
