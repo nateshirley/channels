@@ -1,0 +1,12 @@
+[programs.localnet]
+channels = "WczqDK2L6bHkQVwrZuSmKFyUvgVTHtgE4zsGfQ1wmfi"
+
+[registry]
+url = "https://anchor.projectserum.com"
+
+[provider]
+cluster = "https://lingering-lingering-mountain.solana-devnet.quiknode.pro/fbbd36836095686bd9f580212e675aaab88204c9/"
+wallet = "/Users/nathanshirley/.config/solana/id.json"
+
+[scripts]
+test = "mocha -t 1000000 tests/"
