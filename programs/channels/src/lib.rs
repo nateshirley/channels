@@ -1,11 +1,11 @@
 use anchor_lang::{
     prelude::*,
-    solana_program::{self, borsh::try_from_slice_unchecked, program_option::COption},
+    solana_program::{borsh::try_from_slice_unchecked, program_option::COption},
 };
-use anchor_spl::token::{self, Mint, Token, TokenAccount};
+use anchor_spl::token;
 use anchor_token_metadata;
 use spl_token::instruction::AuthorityType;
-use spl_token_metadata::{self, instruction::update_metadata_accounts};
+use spl_token_metadata;
 
 declare_id!("WczqDK2L6bHkQVwrZuSmKFyUvgVTHtgE4zsGfQ1wmfi");
 const MINT_AUTH_SEED: &[u8] = b"authority";
@@ -21,9 +21,7 @@ pub mod channels {
         _mint_auth_bump: u8,
         metadata_inputs: MetadataInputs,
     ) -> ProgramResult {
-        let (_mint_auth, bump_seed) =
-            Pubkey::find_program_address(&[MINT_AUTH_SEED], ctx.program_id);
-        let seeds = &[&MINT_AUTH_SEED[..], &[bump_seed]];
+        let seeds = &[&MINT_AUTH_SEED[..], &[_mint_auth_bump]];
 
         //mint one channel token to creator
         token::mint_to(
@@ -70,6 +68,24 @@ pub mod channels {
         ctx.accounts.subscription_attribution.channel = ctx.accounts.channel.key();
         ctx.accounts.subscription_attribution.subscription = ctx.accounts.subscription.key();
 
+        //mark both accounts w/ primary sale happened to avoid confusion on seller fees
+        anchor_token_metadata::update_metadata(
+            ctx.accounts
+                .into_update_channel_metadata_context()
+                .with_signer(&[&seeds[..]]),
+            None,
+            None,
+            Some(true),
+        )?;
+        anchor_token_metadata::update_metadata(
+            ctx.accounts
+                .into_update_subscription_metadata_context()
+                .with_signer(&[&seeds[..]]),
+            None,
+            None,
+            Some(true),
+        )?;
+
         //freeze channel token supply
         token::set_authority(
             ctx.accounts
@@ -81,9 +97,7 @@ pub mod channels {
         Ok(())
     }
     pub fn subscribe(ctx: Context<Subscribe>, _mint_auth_bump: u8) -> ProgramResult {
-        let (_mint_auth, bump_seed) =
-            Pubkey::find_program_address(&[MINT_AUTH_SEED], ctx.program_id);
-        let seeds = &[&MINT_AUTH_SEED[..], &[bump_seed]];
+        let seeds = &[&MINT_AUTH_SEED[..], &[_mint_auth_bump]];
         //mint one subscription token to the subscriber
         token::mint_to(
             ctx.accounts
@@ -91,7 +105,6 @@ pub mod channels {
                 .with_signer(&[&seeds[..]]),
             1,
         )?;
-
         Ok(())
     }
     pub fn update_channel_and_subscription_metadata(
@@ -100,9 +113,7 @@ pub mod channels {
         _subscription_attribution_bump: u8,
         update_metadata_inputs: UpdateMetadataInputs,
     ) -> ProgramResult {
-        let (_mint_auth, bump_seed) =
-            Pubkey::find_program_address(&[MINT_AUTH_SEED], ctx.program_id);
-        let seeds = &[&MINT_AUTH_SEED[..], &[bump_seed]];
+        let seeds = &[&MINT_AUTH_SEED[..], &[_mint_auth_bump]];
 
         let existing_metadata: spl_token_metadata::state::Metadata =
             try_from_slice_unchecked(&ctx.accounts.channel_metadata.data.borrow()).unwrap();
@@ -125,7 +136,6 @@ pub mod channels {
             Some(new_data.clone()),
             None,
         )?;
-
         anchor_token_metadata::update_metadata(
             ctx.accounts
                 .into_update_subscription_metadata_context()
@@ -220,7 +230,7 @@ pub struct Subscribe<'info> {
         constraint = subscriber_token_account.amount == 0,
         constraint = subscriber_token_account.owner == subscriber.key()
     )]
-    pub subscriber_token_account: Account<'info, TokenAccount>,
+    pub subscriber_token_account: Account<'info, token::TokenAccount>,
     #[account(
         mut,
         constraint = subscription.decimals == 0,
@@ -334,6 +344,28 @@ impl<'info> CreateChannel<'info> {
             token_metadata_program: self.token_metadata_program.to_account_info(),
             system_program: self.system_program.clone(),
             rent: self.rent.clone(),
+        };
+        CpiContext::new(cpi_program, cpi_accounts)
+    }
+    fn into_update_channel_metadata_context(
+        &self,
+    ) -> CpiContext<'_, '_, '_, 'info, anchor_token_metadata::UpdateMetadataAccount<'info>> {
+        let cpi_program = self.token_metadata_program.to_account_info();
+        let cpi_accounts = anchor_token_metadata::UpdateMetadataAccount {
+            metadata: self.channel_metadata.to_account_info(),
+            update_authority: self.mint_auth.to_account_info(),
+            token_metadata_program: self.token_metadata_program.to_account_info(),
+        };
+        CpiContext::new(cpi_program, cpi_accounts)
+    }
+    fn into_update_subscription_metadata_context(
+        &self,
+    ) -> CpiContext<'_, '_, '_, 'info, anchor_token_metadata::UpdateMetadataAccount<'info>> {
+        let cpi_program = self.token_metadata_program.to_account_info();
+        let cpi_accounts = anchor_token_metadata::UpdateMetadataAccount {
+            metadata: self.subscription_metadata.to_account_info(),
+            update_authority: self.mint_auth.to_account_info(),
+            token_metadata_program: self.token_metadata_program.to_account_info(),
         };
         CpiContext::new(cpi_program, cpi_accounts)
     }
