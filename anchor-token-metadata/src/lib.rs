@@ -16,10 +16,6 @@ use {
     },
 };
 
-pub fn main() {
-    println!("Hello, world!");
-}
-
 pub fn create_metadata<'a, 'b, 'c, 'info>(
     ctx: CpiContext<'a, 'b, 'c, 'info, CreateMetadata<'info>>,
     name: String,

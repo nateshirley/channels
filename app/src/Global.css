@@ -1,0 +1,11 @@
+.component-parent {
+  padding-top: 20px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 90%;
+  max-width: 540px;
+  font-family: "IBM Plex Serif", serif;
+  font-style: normal;
+  font-weight: 600;
+  margin-bottom: 150px;
+}
