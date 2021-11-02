@@ -1,8 +1,46 @@
 import { Provider, utils } from '@project-serum/anchor';
-import { PublicKey, SystemProgram, Connection } from '@solana/web3.js';
+import { PublicKey, SystemProgram, Connection, AccountInfo } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import * as BufferLayout from "@solana/buffer-layout"
+import { decodeMetadata } from "./decodeMetadata";
 export const CHANNEL_PROGRAM_ID = new PublicKey("WczqDK2L6bHkQVwrZuSmKFyUvgVTHtgE4zsGfQ1wmfi")
+export const TOKEN_METADATA_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
+
+
+const publicKey = (property: string) => {
+    return BufferLayout.blob(32, property);
+};
+export const AttributionLayout = BufferLayout.struct([
+    BufferLayout.seq(BufferLayout.u8(), 8, "discriminator"),
+    publicKey("creation"),
+    publicKey("subscription"),
+]);
+
+
+interface ChannelTokens {
+    creationTokens: CreationToken[]
+    subscriptionTokens: SubscriptionToken[]
+}
+interface CreationToken {
+    mint: PublicKey,
+    attribution: ChannelAttribution
+}
+interface SubscriptionToken {
+    mint: PublicKey,
+    attribution: ChannelAttribution
+}
+interface ChannelAttribution {
+    creationMint: PublicKey,
+    subscriptionMint: PublicKey
+}
+export interface ChannelOverview {
+    name: string,
+    symbol: string,
+    subscriberCount: string,
+    subscriberMint: string,
+    subscriberMintDisplayString: string,
+    uri: string
+}
 
 export const getAttributionAddress = async (publicKey: PublicKey) => {
     return await PublicKey.findProgramAddress(
@@ -13,39 +51,124 @@ export const getAttributionAddress = async (publicKey: PublicKey) => {
         CHANNEL_PROGRAM_ID
     );
 }
-
-const publicKey = (property: string) => {
-    return BufferLayout.blob(32, property);
-};
-export const AttributionLayout = BufferLayout.struct([
-    BufferLayout.seq(BufferLayout.u8(), 8, "discriminator"),
-    publicKey("creator"),
-    publicKey("subscription"),
-]);
-
-interface Channel {
-    creator: PublicKey,
-    subscription: PublicKey
+//need to take a search string and say if it's a channel or a subscription
+export const fetchChannelAttribtion = async (tokenMint: PublicKey, connection: Connection): Promise<[string, ChannelAttribution] | undefined> => {
+    let [attributionAddress, _bump] = await getAttributionAddress(tokenMint);
+    let attribution = await getDecodedAttribution(attributionAddress, connection);
+    if (attribution) {
+        if (tokenMint.equals(attribution.subscriptionMint)) {
+            return ["subscription", attribution];
+        } else {
+            return ["creation", attribution];
+        }
+    }
 }
 
-//need to take a search string and say if it's a channel or a subscription
-export const getChannelAttribtion = async (tokenMintKey: PublicKey, connection: Connection): Promise<[string, Channel] | undefined> => {
-    let [attributionAddress, _bump] = await getAttributionAddress(tokenMintKey);
+const getTokenAccountsForWallet = async (walletKey: PublicKey, connection: Connection) => {
+    let tokenAccountResponses = await connection.getTokenAccountsByOwner(walletKey, {
+        programId: TOKEN_PROGRAM_ID
+    });
+    return tokenAccountResponses.value
+}
+const getDecodedAttribution = async (attributionAddress: PublicKey, connection: Connection) => {
     let rawAttribution = await connection.getAccountInfo(
         attributionAddress
     );
     if (rawAttribution) {
-        let decoded = AttributionLayout.decode(
+        let decodedAttribution = AttributionLayout.decode(
             rawAttribution.data
         );
-        let attribution: Channel = {
-            creator: new PublicKey(decoded.creator),
-            subscription: new PublicKey(decoded.subscription)
-        }
-        if (tokenMintKey.equals(attribution.subscription)) {
-            return ["subscription", attribution];
-        } else {
-            return ["creator", attribution];
+        return {
+            creationMint: new PublicKey(decodedAttribution.creation),
+            subscriptionMint: new PublicKey(decodedAttribution.subscription)
         }
     }
+}
+
+export const fetchChannelTokensForWallet = async (walletKey: PublicKey, connection: Connection) => {
+    let tokenAccountResponses = await getTokenAccountsForWallet(walletKey, connection);
+    let subscriptionTokens: SubscriptionToken[] = [];
+    let creationTokens: CreationToken[] = [];
+    var promises: Promise<void>[] = [];
+    tokenAccountResponses.forEach((tokenAccountResponse) => {
+        let mint = new PublicKey(tokenAccountResponse.account.data.slice(0, 32));
+        promises.push(getAttributionAddress(mint).then(result => getDecodedAttribution(result[0], connection).then((attribution) => {
+            if (attribution) {
+                if (mint.equals(attribution.subscriptionMint)) {
+                    subscriptionTokens.push({
+                        mint: mint,
+                        attribution: attribution
+                    });
+                } else {
+                    creationTokens.push({
+                        mint: mint,
+                        attribution: attribution
+                    });
+                }
+
+            }
+        })));
+    });
+    await Promise.all(promises)
+    let channelTokens: ChannelTokens = {
+        creationTokens: creationTokens,
+        subscriptionTokens: subscriptionTokens
+    }
+    return channelTokens
+}
+
+export const getMetadataAddress = async (mint: PublicKey) => {
+    return await PublicKey.findProgramAddress(
+        [
+            Buffer.from("metadata"),
+            TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+            mint.toBuffer(),
+        ],
+        TOKEN_METADATA_PROGRAM_ID
+    );
+}
+export const isMetadataV1Account = (accountInfo: AccountInfo<Buffer>) => {
+    return accountInfo.owner.equals(TOKEN_METADATA_PROGRAM_ID) && accountInfo.data[0] === 4;
+}
+/* parsed struct
+decimals: 0
+freezeAuthority: null
+isInitialized: true
+mintAuthority: null
+supply: "1"
+*/
+export const fetchChannelOverview = async (subscriberMint: PublicKey, connection: Connection) => {
+    let accountData: any = (await connection.getParsedAccountInfo(subscriberMint)).value?.data;
+    if (accountData) {
+        let parsedAccountInfo = accountData.parsed.info;
+        const [metadataAddress, _bump] = await getMetadataAddress(subscriberMint);
+        const accountInfo = await connection.getAccountInfo(metadataAddress);
+        if (accountInfo && isMetadataV1Account(accountInfo)) {
+            const metadata = decodeMetadata(accountInfo.data);
+            let overview: ChannelOverview = {
+                name: metadata.data.name,
+                symbol: metadata.data.symbol,
+                subscriberCount: parsedAccountInfo.supply,
+                subscriberMint: subscriberMint.toBase58(),
+                subscriberMintDisplayString: toDisplayString(subscriberMint),
+                uri: metadata.data.uri
+            }
+            return overview
+        }
+    }
+}
+export const fetchChannelCreator = async (creationMint: PublicKey, connection: Connection) => {
+    let accounts = (await connection.getTokenLargestAccounts(creationMint)).value;
+    if (accounts.length === 1) { //only one creator token
+        let accountAddress = accounts[0].address
+        let tokenAccountData: any = (await connection.getParsedAccountInfo(accountAddress)).value?.data;
+        if (tokenAccountData) {
+            let walletAddress = tokenAccountData.parsed.info.owner
+            return new PublicKey(walletAddress);
+        }
+    }
+}
+const toDisplayString = (publicKey: PublicKey, sliceLength: number = 4) => {
+    let b58 = publicKey.toBase58();
+    return (b58.slice(0, sliceLength) + "..." + b58.slice(b58.length - (sliceLength + 1), b58.length - 1));
 }

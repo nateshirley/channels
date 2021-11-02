@@ -27,9 +27,9 @@ const assert = require("assert");
 const publicKey = (property) => {
   return BufferLayout.blob(32, property);
 };
-const AttributionLayout = BufferLayout.struct([
+const ChannelAttributionLayout = BufferLayout.struct([
   BufferLayout.seq(BufferLayout.u8(), 8, "discriminator"),
-  publicKey("channel"),
+  publicKey("creation"),
   publicKey("subscription"),
 ]);
 const terminalWalletKey = new PublicKey("5J8jLVz5YY5uc9sJuWtx42VVMUanLGYWoPXMRu7GsNEJ");
@@ -112,11 +112,11 @@ describe("channels", () => {
       {
         accounts: {
           creator: creator.publicKey,
-          channelTokenAccount: channelTokenAccount,
-          channel: channel.publicKey,
-          channelAttribution: _channelAttribution,
-          channelMetadata: _channelMetadata,
-          subscription: subscription.publicKey,
+          creationTokenAccount: channelTokenAccount,
+          creationMint: channel.publicKey,
+          creationAttribution: _channelAttribution,
+          creationMetadata: _channelMetadata,
+          subscriptionMint: subscription.publicKey,
           subscriptionAttribution: _subscriptionAttribution,
           subscriptionMetadata: _subscriptionMetadata,
           mintAuth: mintAuth,
@@ -174,15 +174,15 @@ describe("channels", () => {
     console.log("create signature", ctx);
 
     //check for attribution pda data
-    let rawChannelAttribution = await provider.connection.getAccountInfo(
+    let rawCreationAttribution = await provider.connection.getAccountInfo(
       _channelAttribution
     );
-    let channelAttributionDecoded = AttributionLayout.decode(
-      rawChannelAttribution.data
+    let creationAttributionDecoded = ChannelAttributionLayout.decode(
+      rawCreationAttribution.data
     );
     // //console.log(channelDecoded);
     readableAttribution(
-      channelAttributionDecoded,
+      creationAttributionDecoded,
       channel.publicKey,
       subscription.publicKey
     );
@@ -190,7 +190,7 @@ describe("channels", () => {
     let rawSubAttribution = await provider.connection.getAccountInfo(
       _subscriptionAttribution
     );
-    let subAttributionDecoded = AttributionLayout.decode(
+    let subAttributionDecoded = ChannelAttributionLayout.decode(
       rawSubAttribution.data
     );
     //console.log(channelDecoded);
@@ -230,7 +230,7 @@ describe("channels", () => {
       accounts: {
         subscriber: subscriber.publicKey,
         subscriberTokenAccount: subscriberTokenAccount,
-        subscription: subscription.publicKey,
+        subscriptionMint: subscription.publicKey,
         mintAuth: mintAuth,
         tokenProgram: TOKEN_PROGRAM_ID,
       },
@@ -262,7 +262,7 @@ describe("channels", () => {
         attributionKey
       );
       if (rawAttribution) {
-        return AttributionLayout.decode(
+        return ChannelAttributionLayout.decode(
           rawAttribution.data
         );
       }
@@ -285,107 +285,65 @@ describe("channels", () => {
       return tokenAccountResponses.value
     }
 
-    const fetchSubscriptionMintsForWallet = async (walletKey, connection) => {
-      let tokenAccountResponses = await getTokenAccountsForWallet(walletKey, connection);
-      let subscriptionMints = [];
-      var promises = [];
-      tokenAccountResponses.forEach((tokenAccountResponse) => {
-        let mintKey = new PublicKey(tokenAccountResponse.account.data.slice(0, 32));
-        promises.push(getAttributionAddress(mintKey).then(result => getDecodedAttribution(result[0]).then((attributionDecoded) => {
-          if (attributionDecoded && mintKey.toBuffer().equals(attributionDecoded.subscription)) {
-            subscriptionMints.push({
-              subscriptionMint: mintKey,
-              attribution: attributionDecoded
-            });
-          }
-        })));
-      });
-      await Promise.all(promises)
-      return subscriptionMints
-    }
-
-    const fetchChannelMintsForWallet = async (walletKey, connection) => {
-      let tokenAccountResponses = await getTokenAccountsForWallet(walletKey, connection);
-      let channelMints = [];
-      var promises = [];
-      tokenAccountResponses.forEach((tokenAccountResponse) => {
-        let mintKey = new PublicKey(tokenAccountResponse.account.data.slice(0, 32));
-        promises.push(getAttributionAddress(mintKey).then(result => getDecodedAttribution(result[0]).then((attributionDecoded) => {
-          if (attributionDecoded && mintKey.toBuffer().equals(attributionDecoded.channel)) {
-            channelMints.push({
-              channelMint: mintKey,
-              attribution: attributionDecoded
-            });
-          }
-        })));
-      });
-      await Promise.all(promises)
-      return channelMints
-    }
-
-    let channelMints = await fetchChannelMintsForWallet(terminalWalletKey, provider.connection);
-    console.log(channelMints.length);
-    let subscriptionMints = await fetchSubscriptionMintsForWallet(subscriber.publicKey, provider.connection);
-    console.log(subscriptionMints.length);
   });
 
 
 
 
-  /*
-    it('update the metadata', async () => {
-      let channelTokenAccount = await getAssociatedTokenAccountAddress(creator.publicKey, channel.publicKey)
-      let [_channelMetadata, _channelMetadataBump] = await getMetadataAddress(
-        channel.publicKey
-      );
-      let [_subscriptionMetadata, _subscriptionMetadataBump] =
-        await getMetadataAddress(subscription.publicKey);
-      let [_subscriptionAttribution, _subscriptionAttributionBump] =
-        await PublicKey.findProgramAddress(
-          [
-            anchor.utils.bytes.utf8.encode("channel"),
-            subscription.publicKey.toBuffer(),
-          ],
-          program.programId
-        );
-      let [_mintAuth, _mintAuthBump] = await PublicKey.findProgramAddress(
-        [anchor.utils.bytes.utf8.encode("authority")],
+
+  it('update the metadata', async () => {
+    let channelTokenAccount = await getAssociatedTokenAccountAddress(creator.publicKey, channel.publicKey)
+    let [_channelMetadata, _channelMetadataBump] = await getMetadataAddress(
+      channel.publicKey
+    );
+    let [_subscriptionMetadata, _subscriptionMetadataBump] =
+      await getMetadataAddress(subscription.publicKey);
+    let [_subscriptionAttribution, _subscriptionAttributionBump] =
+      await PublicKey.findProgramAddress(
+        [
+          anchor.utils.bytes.utf8.encode("channel"),
+          subscription.publicKey.toBuffer(),
+        ],
         program.programId
       );
-      const updateMetadataInputs = {
-        name: "updated Channel",
-        symbol: "BCBB",
-        uri: "https://nateshirley.github.io/data/default.json",
-      };
-  
-      const tx = await program.rpc.updateChannelAndSubscriptionMetadata(_mintAuthBump, _subscriptionAttributionBump, updateMetadataInputs, {
-        accounts: {
-          creator: creator.publicKey,
-          channel: channel.publicKey,
-          channelTokenAccount: channelTokenAccount,
-          channelMetadata: _channelMetadata,
-          subscription: subscription.publicKey,
-          subscriptionAttribution: _subscriptionAttribution,
-          subscriptionMetadata: _subscriptionMetadata,
-          mintAuth: _mintAuth,
-          systemProgram: SystemProgram.programId,
-          tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID
-        },
-        signers: [
-          creator
-        ]
-      });
+    let [_mintAuth, _mintAuthBump] = await PublicKey.findProgramAddress(
+      [anchor.utils.bytes.utf8.encode("authority")],
+      program.programId
+    );
+    const updateMetadataInputs = {
+      name: "updated Channel",
+      symbol: "BCBB",
+      uri: "https://nateshirley.github.io/data/default.json",
+    };
+
+    const tx = await program.rpc.updateChannelMetadata(_mintAuthBump, _subscriptionAttributionBump, updateMetadataInputs, {
+      accounts: {
+        creator: creator.publicKey,
+        creationMint: channel.publicKey,
+        creationTokenAccount: channelTokenAccount,
+        creationMetadata: _channelMetadata,
+        subscriptionMint: subscription.publicKey,
+        subscriptionAttribution: _subscriptionAttribution,
+        subscriptionMetadata: _subscriptionMetadata,
+        mintAuth: _mintAuth,
+        systemProgram: SystemProgram.programId,
+        tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID
+      },
+      signers: [
+        creator
+      ]
     });
-    */
+  });
+
 });
 
-const readableAttribution = (decodedAttribution, channel, subscription) => {
-  let channelPk = new PublicKey(decodedAttribution.channel);
+const readableAttribution = (decodedAttribution, creation, subscription) => {
+  let creationPk = new PublicKey(decodedAttribution.creation);
   let subscriptionPk = new PublicKey(decodedAttribution.subscription);
   //console.log("channel is ", channelPk.toBase58());
   //console.log("subscription is", subscriptionPk.toBase58());
   //console.log(channel.toBase58());
-  assert.ok(channelPk.equals(channel));
+  assert.ok(creationPk.equals(creation));
   assert.ok(subscriptionPk.equals(subscription));
 };
 

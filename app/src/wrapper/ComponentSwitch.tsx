@@ -14,7 +14,7 @@ const ComponentSwitch: FC = () => {
     let wallet: any = useWallet()
 
     const getProvider = () => {
-        const network = clusterApiUrl('devnet');
+        const network = "https://lingering-lingering-mountain.solana-devnet.quiknode.pro/fbbd36836095686bd9f580212e675aaab88204c9/" //clusterApiUrl('devnet');
         let providerWallet: Wallet = wallet
         const commitment: Commitment = "processed";
         const connection = new Connection(network, commitment);
