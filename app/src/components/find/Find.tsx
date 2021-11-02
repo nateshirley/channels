@@ -6,7 +6,7 @@ import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useHistory } from 'react-router-dom';
 import bs58 from 'bs58';
-import { getAttributionAddress, getChannelAttribtion } from '../../modules/channels'
+import { getAttributionAddress, fetchChannelAttribtion, fetchChannelTokensForWallet, fetchChannelCreator, ChannelOverview, fetchChannelOverview } from '../../modules/channels'
 
 import SearchBar from './SearchBar'
 import { publicKey } from "@project-serum/anchor/dist/cjs/utils";
@@ -14,6 +14,17 @@ import { publicKey } from "@project-serum/anchor/dist/cjs/utils";
 
 interface GetProvider {
     getProvider: () => Provider
+}
+
+const createChannelOverview = (): ChannelOverview => {
+    return {
+        name: "",
+        symbol: "",
+        subscriberCount: "",
+        subscriberMint: "",
+        subscriberMintDisplayString: "",
+        uri: ""
+    }
 }
 const Searches = {
     SUBSCRIPTION: "subscription",
@@ -28,6 +39,8 @@ function Find(props: GetProvider) {
     const [searchStatus, setSearchStatus] = useState(Searches.NONE);
     const history = useHistory();
     const [searchText, setSearchText] = useState('');
+    const [channelOverview, setChannelOverview] = useState(createChannelOverview());
+    const [channelCreator, setChannelCreator] = useState("")
 
     const handleSearchChange = (text: string) => {
         setSearchText(text);
@@ -37,23 +50,34 @@ function Find(props: GetProvider) {
         search(searchText);
     }
     const search = async (searchText: string) => {
+        const provider = getProvider();
         let decoded = bs58.decode(searchText);
         if (decoded.length === 32) {
             let publicKey = new PublicKey(searchText);
-            let channelAttribution = await getChannelAttribtion(publicKey, getProvider().connection);
+            let channelAttribution = await fetchChannelAttribtion(publicKey, provider.connection);
             if (channelAttribution) {
                 let [tokenType, attribution] = channelAttribution;
                 setSearchStatus(tokenType);
-                console.log("token is ", tokenType);
+                let overview = await fetchChannelOverview(attribution.subscriptionMint, provider.connection);
+                if (overview) {
+                    setChannelOverview(overview);
+                }
+                let creator = await fetchChannelCreator(attribution.creationMint, provider.connection);
+                if (creator) {
+                    setChannelCreator(creator.toBase58());
+                }
             } else {
                 setSearchStatus(Searches.WALLET);
                 console.log("search is wallet");
-                //fetchPackMintsForWallet(publicKey);
+                let channelTokens = await fetchChannelTokensForWallet(publicKey, provider.connection);
+                console.log(channelTokens)
             }
         } else {
             console.log("not searching bc query doesn't match type")
         }
     }
+
+
 
 
     let infoCards = null;
