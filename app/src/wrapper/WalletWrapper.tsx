@@ -38,7 +38,7 @@ const WalletWrapper: FC = () => {
 
     return (
         <ConnectionProvider endpoint={endpoint}>
-            <WalletProvider wallets={wallets} onError={onError} autoConnect>
+            <WalletProvider wallets={wallets} onError={onError}>
                 <WalletModalProvider>
                     <NavigationBar />
                     <ComponentSwitch />

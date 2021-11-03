@@ -12,16 +12,21 @@ interface Props {
 
 function ChannelInteractiveCard(props: Props) {
 
+    //make it subscribe
 
     let body = <div></div>;
-
-    if (props.privilege === "creation") {
+    console.log(props.privilege, "!!!!!")
+    if (props.privilege === "edit") {
         body = (
-            <button>edit</button>
+            <button>edit -- u created this</button>
         );
     } else if (props.privilege === "subscribe") {
         body = (
             <button>subscribe</button>
+        )
+    } else if (props.privilege === "subscribed") {
+        body = (
+            <button>u already subscribed to this</button>
         )
     } else {
         body = (

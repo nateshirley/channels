@@ -30,7 +30,7 @@ export const createChannelFromProgram = async (name: string, symbol: string, pro
     let [_nameAttribution, _nameAttributionBump] =
         await PublicKey.findProgramAddress(
             [
-                anchorUtils.bytes.utf8.encode(name),
+                anchorUtils.bytes.utf8.encode(name.toLowerCase()),
             ],
             program.programId
         );

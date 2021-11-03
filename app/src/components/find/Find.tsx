@@ -6,7 +6,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useHistory } from 'react-router-dom';
 import bs58 from 'bs58';
 import qs from "qs";
-import { fetchChannelAttribtion, fetchChannelTokensForWallet, fetchChannelCreator, ChannelOverview, ChannelTokens, fetchChannelOverview, fetchDataObjectAtUri } from '../../modules/findChannels'
+import { fetchChannelAttributionByMint, ChannelOverview, fetchChannelOverview, fetchChannelAttributionByName, fetchDataObjectAtUri, ChannelAttribution, fetchCreatedChannelsForWallet, fetchSubscriptionsForWallet } from '../../modules/findChannels'
 import ChannelOverviewCard from "./ChannelOverview";
 import ChannelInteractiveCard from "./ChannelInteractiveCard";
 import SearchBar from './SearchBar'
@@ -26,21 +26,17 @@ const emptyChannelOverview = (): ChannelOverview => {
         uri: ""
     }
 }
-const emptyChannelTokens = (): ChannelTokens => {
-    return {
-        creationTokens: [],
-        subscriptionTokens: []
-    }
-}
+const emptyAttribution = (): ChannelAttribution[] => [];
+
 const Searches = {
-    SUBSCRIPTION: "subscription",
-    CREATION: "creation",
+    CHANNEL: "channel",
     WALLET: "wallet",
     NONE: "none"
 }
 const Privilege = {
     EDIT: "edit",
     SUBSCRIBE: "subscribe",
+    SUBSCRIBED: "subscribed",
     NONE: "none"
 }
 
@@ -52,12 +48,12 @@ function Find(props: GetProvider) {
     const [searchText, setSearchText] = useState('');
     const [channelOverview, setChannelOverview] = useState(emptyChannelOverview());
     const [channelImageLink, setChannelImageLink] = useState("");
-    const [channelCreator, setChannelCreator] = useState(SystemProgram.programId)
     const [channelAttribution, setChannelAttribution] = useState({
         creator: SystemProgram.programId,
         subscriptionMint: SystemProgram.programId
     })
-    const [channelTokensForWallet, setChannelTokensForWallet] = useState(emptyChannelTokens())
+    const [subscriptionsForWallet, setSubscriptionsForWallet] = useState(emptyAttribution());
+    const [createdChannelsForWallet, setCreatedChannelsForWallet] = useState(emptyAttribution());
     const [channelPrivilege, setChannelPrivilege] = useState(Privilege.NONE);
 
     const handleSearchChange = (text: string) => {
@@ -67,43 +63,59 @@ function Find(props: GetProvider) {
         history.push("?key=" + searchText);
         search(searchText);
     }
+    const assertNewOverview = async (newAttribution: ChannelAttribution) => {
+        const provider = getProvider();
+        let overview = await fetchChannelOverview(newAttribution.subscriptionMint, provider.connection);
+        if (overview) {
+            setChannelOverview(overview);
+            let dataObject = await fetchDataObjectAtUri(overview.uri);
+            if (dataObject) {
+                setChannelImageLink(dataObject.image);
+            }
+        }
+    }
+
     const search = async (searchText: string) => {
         const provider = getProvider();
-        let decoded = bs58.decode(searchText);
-        //if u can decode it in 32, search by creator wallet, otherwise do it by the name
-        if (decoded.length === 32) {
+        try {
             let publicKey = new PublicKey(searchText);
-            let channelAttribution = await fetchChannelAttribtion(publicKey, provider.connection);
-            if (channelAttribution) {
-                let [tokenType, attribution] = channelAttribution;
-                setSearchStatus(tokenType);
-                setChannelAttribution({
-                    creator: attribution.creator,
-                    subscriptionMint: attribution.subscriptionMint
-                })
-                let overview = await fetchChannelOverview(attribution.subscriptionMint, provider.connection);
-                if (overview) {
-                    setChannelOverview(overview);
-                    let dataObject = await fetchDataObjectAtUri(overview.uri);
-                    if (dataObject) {
-                        setChannelImageLink(dataObject.image);
-                    }
-                }
-                let creator = await fetchChannelCreator(attribution.creator, provider.connection);
-                if (creator) {
-                    setChannelCreator(creator);
-                }
+            let newAttribution = await fetchChannelAttributionByMint(publicKey, provider.connection);
+            if (newAttribution) {
+                setSearchStatus(Searches.CHANNEL);
+                setChannelAttribution(newAttribution)
+                assertNewOverview(newAttribution);
             } else {
                 setSearchStatus(Searches.WALLET);
                 console.log("search is wallet");
-                let channelTokens = await fetchChannelTokensForWallet(publicKey, provider.connection);
-                setChannelTokensForWallet(channelTokens);
-                console.log(channelTokens);
+                fetchCreatedChannelsForWallet(publicKey, provider.connection).then((createdChannels) => {
+                    setCreatedChannelsForWallet(createdChannels);
+                    console.log(createdChannels);
+                });
+                fetchSubscriptionsForWallet(publicKey, provider.connection).then((subscriptions) => {
+                    setSubscriptionsForWallet(subscriptions);
+                    console.log(subscriptions);
+                })
             }
-        } else {
-            console.log("not searching bc query doesn't match type")
+        } catch {
+            console.log("caught")
+            let newAttribution = await fetchChannelAttributionByName(searchText, provider.connection);
+            if (newAttribution) {
+                setSearchStatus(Searches.CHANNEL);
+                setChannelAttribution(newAttribution)
+                assertNewOverview(newAttribution);
+            }
         }
+        //if u can decode it in 32, search by creator wallet, otherwise do it by the name
+        // if (decoded.length === 32) {
+        //     let publicKey = new PublicKey(searchText);
+
+        // } else { //search by name
+
+        //     console.log("not searching bc query doesn't match type")
+        // }
     }
+
+
 
     //redo the search if user presses back. should probably be in state, but fuck it
     useEffect(() => {
@@ -129,12 +141,9 @@ function Find(props: GetProvider) {
         const filterParams = history.location.search.substr(1);
         const filtersFromParams = qs.parse(filterParams);
         if (filtersFromParams.key) {
-            let searchKey = String(filtersFromParams.key)
-            let decoded = bs58.decode(searchKey);
-            if (decoded.length === 32) {
-                search(searchKey);
-                setSearchText(searchKey);
-            }
+            let decoded = decodeURI(String(filtersFromParams.key));
+            search(decoded);
+            setSearchText(decoded);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -144,20 +153,20 @@ function Find(props: GetProvider) {
     useEffect(() => {
         const isWalletSubscriber = () => {
             if (wallet.connected) {
-                channelTokensForWallet.subscriptionTokens.forEach((token) => {
-                    if (token.mint.equals(channelAttribution.subscriptionMint)) {
+                subscriptionsForWallet.forEach((attribution) => {
+                    if (attribution.subscriptionMint.equals(channelAttribution.subscriptionMint)) {
                         return true;
                     }
                 });
             }
             return false
         }
-        if (wallet.connected && (searchStatus === Searches.SUBSCRIPTION || searchStatus === Searches.CREATION)) {
-            if (wallet.publicKey && channelCreator.equals(wallet.publicKey)) {
+        if (wallet.connected && (searchStatus === Searches.CHANNEL)) {
+            if (wallet.publicKey && channelAttribution.creator.equals(wallet.publicKey)) {
                 setChannelPrivilege(Privilege.EDIT)
                 return
             } else if (isWalletSubscriber()) {
-                setChannelPrivilege(Privilege.NONE);
+                setChannelPrivilege(Privilege.SUBSCRIBED);
                 return
             } else {
                 setChannelPrivilege(Privilege.SUBSCRIBE);
@@ -165,13 +174,13 @@ function Find(props: GetProvider) {
             }
         }
         setChannelPrivilege(Privilege.NONE);
-    }, [wallet.connected, wallet.publicKey, channelAttribution, channelTokensForWallet, channelCreator, searchStatus])
+    }, [wallet.connected, wallet.publicKey, channelAttribution, subscriptionsForWallet, searchStatus])
 
 
 
     let infoCards = null;
     switch (searchStatus) {
-        case Searches.CREATION:
+        case Searches.CHANNEL:
             infoCards = (
                 <div>
                     <ChannelOverviewCard overview={channelOverview} imageLink={channelImageLink} attribution={channelAttribution} />

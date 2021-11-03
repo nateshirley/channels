@@ -35,19 +35,11 @@ export const decodeAttribution = (rawAttributionData: Buffer) => {
     };
 }
 
-
-export interface ChannelTokens {
-    creationTokens: CreationToken[]
-    subscriptionTokens: SubscriptionToken[]
-}
-interface CreationToken {
-    mint: PublicKey,
-    attribution: ChannelAttribution
-}
-interface SubscriptionToken {
-    mint: PublicKey,
-    attribution: ChannelAttribution
-}
+// export interface WalletSubscription {
+//     mint: PublicKey,
+//     tokenAccount: PublicKey,
+//     attribution: ChannelAttribution
+// }
 export interface ChannelAttribution {
     creator: PublicKey,
     subscriptionMint: PublicKey
@@ -83,33 +75,39 @@ export const fetchCreatedChannelsForWallet = async (walletAddress: PublicKey, co
             },
         ]
     }
-    let attributionAccounts = await connection.getProgramAccounts(
+    let responses = await connection.getProgramAccounts(
         CHANNEL_PROGRAM_ID,
         config
     );
-    return attributionAccounts;
+    let decodedResponses = responses.map((response) => {
+        return decodeAttribution(response.account.data);
+    })
+    return decodedResponses;
 }
 
-export const getAttributionAddress = async (publicKey: PublicKey) => {
+export const getAttributionAddressByMint = async (mint: PublicKey) => {
     return await PublicKey.findProgramAddress(
         [
             utils.bytes.utf8.encode("channel"),
-            publicKey.toBuffer(),
+            mint.toBuffer(),
         ],
         CHANNEL_PROGRAM_ID
     );
 }
+export const getAttributionAddressByName = async (name: string) => {
+    return await PublicKey.findProgramAddress(
+        [utils.bytes.utf8.encode(name.toLowerCase())],
+        CHANNEL_PROGRAM_ID
+    );
+}
 //need to take a search string and say if it's a channel or a subscription
-export const fetchChannelAttribtion = async (tokenMint: PublicKey, connection: Connection): Promise<[string, ChannelAttribution] | undefined> => {
-    let [attributionAddress, _bump] = await getAttributionAddress(tokenMint);
-    let attribution = await getDecodedAttribution(attributionAddress, connection);
-    if (attribution) {
-        if (tokenMint.equals(attribution.subscriptionMint)) {
-            return ["subscription", attribution];
-        } else {
-            return ["creation", attribution];
-        }
-    }
+export const fetchChannelAttributionByMint = async (tokenMint: PublicKey, connection: Connection) => {
+    let [attributionAddress, _bump] = await getAttributionAddressByMint(tokenMint);
+    return getDecodedAttribution(attributionAddress, connection);
+}
+export const fetchChannelAttributionByName = async (name: string, connection: Connection) => {
+    let [attributionAddress, _bump] = await getAttributionAddressByName(name);
+    return getDecodedAttribution(attributionAddress, connection);
 }
 
 const getTokenAccountsForWallet = async (walletKey: PublicKey, connection: Connection) => {
@@ -120,38 +118,20 @@ const getTokenAccountsForWallet = async (walletKey: PublicKey, connection: Conne
 }
 
 
-export const fetchChannelTokensForWallet = async (walletKey: PublicKey, connection: Connection) => {
+export const fetchSubscriptionsForWallet = async (walletKey: PublicKey, connection: Connection) => {
     let tokenAccountResponses = await getTokenAccountsForWallet(walletKey, connection);
-    let subscriptionTokens: SubscriptionToken[] = [];
-    let creationTokens: CreationToken[] = [];
+    let walletSubscriptions: ChannelAttribution[] = [];
     var promises: Promise<void>[] = [];
     tokenAccountResponses.forEach((tokenAccountResponse) => {
         let mint = new PublicKey(tokenAccountResponse.account.data.slice(0, 32));
-        promises.push(getAttributionAddress(mint).then(result => getDecodedAttribution(result[0], connection).then((attribution) => {
+        promises.push(getAttributionAddressByMint(mint).then(result => getDecodedAttribution(result[0], connection).then((attribution) => {
             if (attribution) {
-                if (mint.equals(attribution.subscriptionMint)) {
-                    subscriptionTokens.push({
-                        mint: mint,
-                        attribution: attribution
-                    });
-                    console.log('sub', mint.toBase58())
-                } else {
-                    creationTokens.push({
-                        mint: mint,
-                        attribution: attribution
-                    });
-                    console.log('creation', mint.toBase58())
-                }
-
+                walletSubscriptions.push(attribution);
             }
         })));
     });
     await Promise.all(promises)
-    let channelTokens: ChannelTokens = {
-        creationTokens: creationTokens,
-        subscriptionTokens: subscriptionTokens
-    }
-    return channelTokens
+    return walletSubscriptions
 }
 
 
@@ -181,17 +161,6 @@ export const fetchChannelOverview = async (subscriberMint: PublicKey, connection
                 uri: metadata.data.uri
             }
             return overview
-        }
-    }
-}
-export const fetchChannelCreator = async (creationMint: PublicKey, connection: Connection) => {
-    let accounts = (await connection.getTokenLargestAccounts(creationMint)).value;
-    if (accounts.length === 1) { //only one creator token
-        let accountAddress = accounts[0].address
-        let tokenAccountData: any = (await connection.getParsedAccountInfo(accountAddress)).value?.data;
-        if (tokenAccountData) {
-            let walletAddress = tokenAccountData.parsed.info.owner
-            return new PublicKey(walletAddress);
         }
     }
 }

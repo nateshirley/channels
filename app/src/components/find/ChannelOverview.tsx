@@ -28,6 +28,7 @@ function ChannelOverviewCard(props: Props) {
                         <div>symbol</div>
                         <div>members</div>
                         <div>token mint</div>
+                        <div>creator</div>
                     </Col>
                     <Col xs={5}>
                         <div className="overview-row">{props.overview.name}</div>
@@ -35,6 +36,8 @@ function ChannelOverviewCard(props: Props) {
                         <div className="overview-row">{props.overview.subscriberCount}</div>
                         <a href={`https://solscan.io/token/${props.attribution.subscriptionMint}?cluster=devnet`} className="overview-row"
                             target="_blank" rel="noreferrer noopener">{props.overview.subscriberMintDisplayString}</a>
+                        <div>{props.attribution.creator.toBase58()}</div>
+
                     </Col>
                 </Row>
             </Container>

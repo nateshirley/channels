@@ -43,8 +43,7 @@ function New(props: GetProvider) {
         const walletAddress = wallet.publicKey;
         if (!walletAddress) { return }
         let accounts = await fetchCreatedChannelsForWallet(walletAddress, connection);
-        let attribution = decodeAttribution(accounts[0].account.data);
-        console.log(attribution.subscriptionMint.toBase58());
+        console.log(accounts[0].subscriptionMint.toBase58());
     }
 
     let body = null;
