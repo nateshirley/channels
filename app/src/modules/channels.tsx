@@ -17,7 +17,7 @@ export const AttributionLayout = BufferLayout.struct([
 ]);
 
 
-interface ChannelTokens {
+export interface ChannelTokens {
     creationTokens: CreationToken[]
     subscriptionTokens: SubscriptionToken[]
 }
@@ -29,7 +29,7 @@ interface SubscriptionToken {
     mint: PublicKey,
     attribution: ChannelAttribution
 }
-interface ChannelAttribution {
+export interface ChannelAttribution {
     creationMint: PublicKey,
     subscriptionMint: PublicKey
 }
@@ -37,10 +37,10 @@ export interface ChannelOverview {
     name: string,
     symbol: string,
     subscriberCount: string,
-    subscriberMint: string,
     subscriberMintDisplayString: string,
     uri: string
 }
+
 
 export const getAttributionAddress = async (publicKey: PublicKey) => {
     return await PublicKey.findProgramAddress(
@@ -99,11 +99,13 @@ export const fetchChannelTokensForWallet = async (walletKey: PublicKey, connecti
                         mint: mint,
                         attribution: attribution
                     });
+                    console.log('sub', mint.toBase58())
                 } else {
                     creationTokens.push({
                         mint: mint,
                         attribution: attribution
                     });
+                    console.log('creation', mint.toBase58())
                 }
 
             }
@@ -149,7 +151,6 @@ export const fetchChannelOverview = async (subscriberMint: PublicKey, connection
                 name: metadata.data.name,
                 symbol: metadata.data.symbol,
                 subscriberCount: parsedAccountInfo.supply,
-                subscriberMint: subscriberMint.toBase58(),
                 subscriberMintDisplayString: toDisplayString(subscriberMint),
                 uri: metadata.data.uri
             }
@@ -168,7 +169,18 @@ export const fetchChannelCreator = async (creationMint: PublicKey, connection: C
         }
     }
 }
-const toDisplayString = (publicKey: PublicKey, sliceLength: number = 4) => {
+export const toDisplayString = (publicKey: PublicKey, sliceLength: number = 4) => {
     let b58 = publicKey.toBase58();
-    return (b58.slice(0, sliceLength) + "..." + b58.slice(b58.length - (sliceLength + 1), b58.length - 1));
+    return (b58.slice(0, sliceLength) + "..." + b58.slice(b58.length - sliceLength, b58.length));
+}
+
+export const fetchDataObjectAtUri = async (uri: string): Promise<any | undefined> => {
+    try {
+        let response = await fetch(uri);
+        let data = await response.json();
+        return data
+    } catch (ex) {
+        console.error(ex);
+    }
+    console.log("waiting")
 }

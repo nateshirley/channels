@@ -1,35 +1,46 @@
 import "../../Global.css";
-import { Provider, utils } from '@project-serum/anchor';
-import React, { useEffect, useState, useCallback } from "react";
+import { Provider } from '@project-serum/anchor';
+import { useEffect, useState } from "react";
 import { PublicKey, SystemProgram } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useHistory } from 'react-router-dom';
 import bs58 from 'bs58';
-import { getAttributionAddress, fetchChannelAttribtion, fetchChannelTokensForWallet, fetchChannelCreator, ChannelOverview, fetchChannelOverview } from '../../modules/channels'
-
+import qs from "qs";
+import { fetchChannelAttribtion, fetchChannelTokensForWallet, fetchChannelCreator, ChannelOverview, ChannelTokens, fetchChannelOverview, fetchDataObjectAtUri } from '../../modules/channels'
+import ChannelOverviewCard from "./ChannelOverview";
+import ChannelInteractiveCard from "./ChannelInteractiveCard";
 import SearchBar from './SearchBar'
-import { publicKey } from "@project-serum/anchor/dist/cjs/utils";
+//import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
 
 interface GetProvider {
     getProvider: () => Provider
 }
 
-const createChannelOverview = (): ChannelOverview => {
+const emptyChannelOverview = (): ChannelOverview => {
     return {
         name: "",
         symbol: "",
         subscriberCount: "",
-        subscriberMint: "",
         subscriberMintDisplayString: "",
         uri: ""
     }
 }
+const emptyChannelTokens = (): ChannelTokens => {
+    return {
+        creationTokens: [],
+        subscriptionTokens: []
+    }
+}
 const Searches = {
     SUBSCRIPTION: "subscription",
-    CREATOR: "creator",
+    CREATION: "creation",
     WALLET: "wallet",
+    NONE: "none"
+}
+const Privilege = {
+    EDIT: "edit",
+    SUBSCRIBE: "subscribe",
     NONE: "none"
 }
 
@@ -39,8 +50,15 @@ function Find(props: GetProvider) {
     const [searchStatus, setSearchStatus] = useState(Searches.NONE);
     const history = useHistory();
     const [searchText, setSearchText] = useState('');
-    const [channelOverview, setChannelOverview] = useState(createChannelOverview());
-    const [channelCreator, setChannelCreator] = useState("")
+    const [channelOverview, setChannelOverview] = useState(emptyChannelOverview());
+    const [channelImageLink, setChannelImageLink] = useState("");
+    const [channelCreator, setChannelCreator] = useState(SystemProgram.programId)
+    const [channelAttribution, setChannelAttribution] = useState({
+        creationMint: SystemProgram.programId,
+        subscriptionMint: SystemProgram.programId
+    })
+    const [channelTokensForWallet, setChannelTokensForWallet] = useState(emptyChannelTokens())
+    const [channelPrivilege, setChannelPrivilege] = useState(Privilege.NONE);
 
     const handleSearchChange = (text: string) => {
         setSearchText(text);
@@ -58,34 +76,105 @@ function Find(props: GetProvider) {
             if (channelAttribution) {
                 let [tokenType, attribution] = channelAttribution;
                 setSearchStatus(tokenType);
+                setChannelAttribution({
+                    creationMint: attribution.creationMint,
+                    subscriptionMint: attribution.subscriptionMint
+                })
                 let overview = await fetchChannelOverview(attribution.subscriptionMint, provider.connection);
                 if (overview) {
                     setChannelOverview(overview);
+                    let dataObject = await fetchDataObjectAtUri(overview.uri);
+                    if (dataObject) {
+                        setChannelImageLink(dataObject.image);
+                    }
                 }
                 let creator = await fetchChannelCreator(attribution.creationMint, provider.connection);
                 if (creator) {
-                    setChannelCreator(creator.toBase58());
+                    setChannelCreator(creator);
                 }
             } else {
                 setSearchStatus(Searches.WALLET);
                 console.log("search is wallet");
                 let channelTokens = await fetchChannelTokensForWallet(publicKey, provider.connection);
-                console.log(channelTokens)
+                setChannelTokensForWallet(channelTokens);
+                console.log(channelTokens);
             }
         } else {
             console.log("not searching bc query doesn't match type")
         }
     }
 
+    //redo the search if user presses back. should probably be in state, but fuck it
+    useEffect(() => {
+        return history.listen(location => {
+            if (history.action === 'POP') {
+                console.log('back button pressed')
+                const filterParams = history.location.search.substr(1);
+                const filtersFromParams = qs.parse(filterParams);
+                if (filtersFromParams.key) {
+                    let publicKey = String(filtersFromParams.key)
+                    let decoded = bs58.decode(publicKey);
+                    if (decoded.length === 32) {
+                        search(publicKey);
+                        setSearchText(publicKey);
+                    }
+                }
+            }
+        })
+    })
+
+    //this parses the url on first render and does a search if it finds a valid key in url params
+    useEffect(() => {
+        const filterParams = history.location.search.substr(1);
+        const filtersFromParams = qs.parse(filterParams);
+        if (filtersFromParams.key) {
+            let searchKey = String(filtersFromParams.key)
+            let decoded = bs58.decode(searchKey);
+            if (decoded.length === 32) {
+                search(searchKey);
+                setSearchText(searchKey);
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+
+    //determine privilege
+    useEffect(() => {
+        const isWalletSubscriber = () => {
+            if (wallet.connected) {
+                channelTokensForWallet.subscriptionTokens.forEach((token) => {
+                    if (token.mint.equals(channelAttribution.subscriptionMint)) {
+                        return true;
+                    }
+                });
+            }
+            return false
+        }
+        if (wallet.connected && (searchStatus === Searches.SUBSCRIPTION || searchStatus === Searches.CREATION)) {
+            if (wallet.publicKey && channelCreator.equals(wallet.publicKey)) {
+                setChannelPrivilege(Privilege.EDIT)
+                return
+            } else if (isWalletSubscriber()) {
+                setChannelPrivilege(Privilege.NONE);
+                return
+            } else {
+                setChannelPrivilege(Privilege.SUBSCRIBE);
+                return
+            }
+        }
+        setChannelPrivilege(Privilege.NONE);
+    }, [wallet.connected, wallet.publicKey, channelAttribution, channelTokensForWallet, channelCreator, searchStatus])
 
 
 
     let infoCards = null;
     switch (searchStatus) {
-        case Searches.SUBSCRIPTION || Searches.CREATOR:
+        case Searches.CREATION:
             infoCards = (
                 <div>
-
+                    <ChannelOverviewCard overview={channelOverview} imageLink={channelImageLink} attribution={channelAttribution} />
+                    <ChannelInteractiveCard overview={channelOverview} attribution={channelAttribution} privilege={channelPrivilege} getProvider={getProvider} />
                 </div>
             )
             break;
@@ -97,7 +186,6 @@ function Find(props: GetProvider) {
             break;
         default:
             // if (randomPacks.length > 0) {
-
             //     )
             // } else {
             infoCards = (
@@ -111,7 +199,7 @@ function Find(props: GetProvider) {
     }
     return (
         <div className="component-parent">
-            <div className="component-header">Find a Pack</div>
+            <div className="component-header">Find a Channel</div>
             <SearchBar handleSearchChange={handleSearchChange} searchText={searchText} />
             <button className="default-button search" onClick={didPressSearch}>search</button>
             {infoCards}

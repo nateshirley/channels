@@ -4,6 +4,11 @@ import './index.css';
 import reportWebVitals from './reportWebVitals';
 import WalletWrapper from './wrapper/WalletWrapper';
 import { BrowserRouter } from 'react-router-dom';
+import 'bootstrap/dist/css/bootstrap.min.css';
+
+require('@solana/wallet-adapter-react-ui/styles.css');
+require('./index.css');
+
 
 ReactDOM.render(
   <StrictMode>
