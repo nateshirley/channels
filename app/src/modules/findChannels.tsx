@@ -3,8 +3,7 @@ import { PublicKey, SystemProgram, Connection, AccountInfo } from '@solana/web3.
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import * as BufferLayout from "@solana/buffer-layout"
 import { decodeMetadata } from "./decodeMetadata";
-export const CHANNEL_PROGRAM_ID = new PublicKey("WczqDK2L6bHkQVwrZuSmKFyUvgVTHtgE4zsGfQ1wmfi")
-export const TOKEN_METADATA_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
+import { CHANNEL_PROGRAM_ID, TOKEN_METADATA_PROGRAM_ID, getMetadataAddress } from './utils'
 
 
 const publicKey = (property: string) => {
@@ -119,16 +118,7 @@ export const fetchChannelTokensForWallet = async (walletKey: PublicKey, connecti
     return channelTokens
 }
 
-export const getMetadataAddress = async (mint: PublicKey) => {
-    return await PublicKey.findProgramAddress(
-        [
-            Buffer.from("metadata"),
-            TOKEN_METADATA_PROGRAM_ID.toBuffer(),
-            mint.toBuffer(),
-        ],
-        TOKEN_METADATA_PROGRAM_ID
-    );
-}
+
 export const isMetadataV1Account = (accountInfo: AccountInfo<Buffer>) => {
     return accountInfo.owner.equals(TOKEN_METADATA_PROGRAM_ID) && accountInfo.data[0] === 4;
 }

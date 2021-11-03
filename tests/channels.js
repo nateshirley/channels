@@ -41,14 +41,11 @@ describe("channels", () => {
   const program = anchor.workspace.Channels;
 
   let creator = provider.wallet.payer;
-  let channel = Keypair.generate();
+  let creation = Keypair.generate();
   let subscriber = Keypair.generate();
   let subscription = Keypair.generate();
   let mintAuth = null;
-  const channelProgramId = new PublicKey('WczqDK2L6bHkQVwrZuSmKFyUvgVTHtgE4zsGfQ1wmfi');
-
-
-
+  const channelProgramId = new PublicKey('DoFrvHMqrtWmkqnsG61c3myUE5QZkNCCXVaWi7a7PuiG');
 
   it("give a little to the subscriber", async () => {
     let signature = await web3.sendAndConfirmTransaction(
@@ -65,15 +62,17 @@ describe("channels", () => {
   });
 
   it("create a channel", async () => {
-    let channelTokenAccount = await getAssociatedTokenAccountAddress(
+    const name = "big channel2"
+
+    let creationTokenAccount = await getAssociatedTokenAccountAddress(
       creator.publicKey,
-      channel.publicKey
+      creation.publicKey
     );
-    let [_channelAttribution, _channelAttributionBump] =
+    let [_creationAttribution, _creationAttributionBump] =
       await PublicKey.findProgramAddress(
         [
           anchor.utils.bytes.utf8.encode("channel"),
-          channel.publicKey.toBuffer(),
+          creation.publicKey.toBuffer(),
         ],
         program.programId
       );
@@ -89,36 +88,47 @@ describe("channels", () => {
       [anchor.utils.bytes.utf8.encode("authority")],
       program.programId
     );
-    let [_channelMetadata, _channelMetadataBump] = await getMetadataAddress(
-      channel.publicKey
+    let [_nameAttribution, _nameAttributionBump] =
+      await PublicKey.findProgramAddress(
+        [
+          anchor.utils.bytes.utf8.encode(name),
+        ],
+        program.programId
+      );
+    let [_creationMetadata, _creationMetadataBump] = await getMetadataAddress(
+      creation.publicKey
     );
     let [_subscriptionMetadata, _subscriptionMetadataBump] =
       await getMetadataAddress(subscription.publicKey);
-    console.log(_channelAttribution.toBase58(), " the channel attr")
+    console.log(_creationAttribution.toBase58(), " the creation attr")
 
 
     mintAuth = _mintAuth;
     const metadataInputs = {
-      name: "Big Channel",
+      name: name,
       symbol: "BCBB",
-      uri: "https://nateshirley.github.io/data/default.json",
+      uri: "https://nateshirley.github.io/data/channels-default.json",
     };
 
     const ctx = await program.rpc.createChannel(
-      _channelAttributionBump,
+      _creationAttributionBump,
       _subscriptionAttributionBump,
       _mintAuthBump,
-      metadataInputs,
+      _nameAttributionBump,
+      name,
+      metadataInputs.symbol,
+      metadataInputs.uri,
       {
         accounts: {
           creator: creator.publicKey,
-          creationTokenAccount: channelTokenAccount,
-          creationMint: channel.publicKey,
-          creationAttribution: _channelAttribution,
-          creationMetadata: _channelMetadata,
+          creationTokenAccount: creationTokenAccount,
+          creationMint: creation.publicKey,
+          creationAttribution: _creationAttribution,
+          creationMetadata: _creationMetadata,
           subscriptionMint: subscription.publicKey,
           subscriptionAttribution: _subscriptionAttribution,
           subscriptionMetadata: _subscriptionMetadata,
+          nameAttribution: _nameAttribution,
           mintAuth: mintAuth,
           systemProgram: SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
@@ -129,16 +139,16 @@ describe("channels", () => {
           //create channel mint account
           SystemProgram.createAccount({
             fromPubkey: creator.publicKey,
-            newAccountPubkey: channel.publicKey,
+            newAccountPubkey: creation.publicKey,
             space: MintLayout.span,
             lamports:
               await provider.connection.getMinimumBalanceForRentExemption(165),
             programId: TOKEN_PROGRAM_ID,
           }),
-          //init channel mint account
+          //init creation mint account
           Token.createInitMintInstruction(
             TOKEN_PROGRAM_ID,
-            channel.publicKey,
+            creation.publicKey,
             0,
             mintAuth,
             null
@@ -160,22 +170,22 @@ describe("channels", () => {
             mintAuth,
             null
           ),
-          //create associated token account for the channel creator
+          //create associated token account for the creation creator
           createAssociatedTokenAccountInstruction(
-            channel.publicKey,
-            channelTokenAccount,
+            creation.publicKey,
+            creationTokenAccount,
             creator.publicKey,
             creator.publicKey
           ),
         ],
-        signers: [creator, channel, subscription],
+        signers: [creator, creation, subscription],
       }
     );
     console.log("create signature", ctx);
 
     //check for attribution pda data
     let rawCreationAttribution = await provider.connection.getAccountInfo(
-      _channelAttribution
+      _creationAttribution
     );
     let creationAttributionDecoded = ChannelAttributionLayout.decode(
       rawCreationAttribution.data
@@ -183,7 +193,7 @@ describe("channels", () => {
     // //console.log(channelDecoded);
     readableAttribution(
       creationAttributionDecoded,
-      channel.publicKey,
+      creation.publicKey,
       subscription.publicKey
     );
 
@@ -196,24 +206,33 @@ describe("channels", () => {
     //console.log(channelDecoded);
     readableAttribution(
       subAttributionDecoded,
-      channel.publicKey,
+      creation.publicKey,
       subscription.publicKey
     );
 
     //check for creator token amount
-    let channelTokenAccountBalance =
-      await provider.connection.getTokenAccountBalance(channelTokenAccount);
-    assert.ok(channelTokenAccountBalance.value.uiAmount === 1);
+    let creationTokenAccountBalance =
+      await provider.connection.getTokenAccountBalance(creationTokenAccount);
+    assert.ok(creationTokenAccountBalance.value.uiAmount === 1);
 
-    let ChannelToken = new Token(
+    let creationToken = new Token(
       provider.connection,
-      channel.publicKey,
+      creation.publicKey,
       TOKEN_PROGRAM_ID,
       new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"),
       creator
     );
-    let channelInfo = await ChannelToken.getMintInfo();
-    assert.ok(channelInfo.mintAuthority === null);
+    let creationInfo = await creationToken.getMintInfo();
+    assert.ok(creationInfo.mintAuthority === null);
+
+
+    let rawNameAttribution = await provider.connection.getAccountInfo(
+      _nameAttribution
+    );
+    let nameAttributionDecoded = ChannelAttributionLayout.decode(
+      rawNameAttribution.data
+    );
+    console.log(nameAttributionDecoded);
   });
 
 
@@ -292,9 +311,9 @@ describe("channels", () => {
 
 
   it('update the metadata', async () => {
-    let channelTokenAccount = await getAssociatedTokenAccountAddress(creator.publicKey, channel.publicKey)
-    let [_channelMetadata, _channelMetadataBump] = await getMetadataAddress(
-      channel.publicKey
+    let creationTokenAccount = await getAssociatedTokenAccountAddress(creator.publicKey, creation.publicKey)
+    let [_creationMetadata, _creationMetadataBump] = await getMetadataAddress(
+      creation.publicKey
     );
     let [_subscriptionMetadata, _subscriptionMetadataBump] =
       await getMetadataAddress(subscription.publicKey);
@@ -310,18 +329,14 @@ describe("channels", () => {
       [anchor.utils.bytes.utf8.encode("authority")],
       program.programId
     );
-    const updateMetadataInputs = {
-      name: "updated Channel",
-      symbol: "BCBB",
-      uri: "https://nateshirley.github.io/data/default.json",
-    };
+    const newUri = "https://nateshirley.github.io/data/default.json";
 
-    const tx = await program.rpc.updateChannelMetadata(_mintAuthBump, _subscriptionAttributionBump, updateMetadataInputs, {
+    const tx = await program.rpc.updateChannelMetadata(_mintAuthBump, _subscriptionAttributionBump, newUri, {
       accounts: {
         creator: creator.publicKey,
-        creationMint: channel.publicKey,
-        creationTokenAccount: channelTokenAccount,
-        creationMetadata: _channelMetadata,
+        creationMint: creation.publicKey,
+        creationTokenAccount: creationTokenAccount,
+        creationMetadata: _creationMetadata,
         subscriptionMint: subscription.publicKey,
         subscriptionAttribution: _subscriptionAttribution,
         subscriptionMetadata: _subscriptionMetadata,
@@ -340,9 +355,9 @@ describe("channels", () => {
 const readableAttribution = (decodedAttribution, creation, subscription) => {
   let creationPk = new PublicKey(decodedAttribution.creation);
   let subscriptionPk = new PublicKey(decodedAttribution.subscription);
-  //console.log("channel is ", channelPk.toBase58());
+  //console.log("creation is ", creationPk.toBase58());
   //console.log("subscription is", subscriptionPk.toBase58());
-  //console.log(channel.toBase58());
+  //console.log(creation.toBase58());
   assert.ok(creationPk.equals(creation));
   assert.ok(subscriptionPk.equals(subscription));
 };

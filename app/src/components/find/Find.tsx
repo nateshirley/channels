@@ -6,7 +6,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useHistory } from 'react-router-dom';
 import bs58 from 'bs58';
 import qs from "qs";
-import { fetchChannelAttribtion, fetchChannelTokensForWallet, fetchChannelCreator, ChannelOverview, ChannelTokens, fetchChannelOverview, fetchDataObjectAtUri } from '../../modules/channels'
+import { fetchChannelAttribtion, fetchChannelTokensForWallet, fetchChannelCreator, ChannelOverview, ChannelTokens, fetchChannelOverview, fetchDataObjectAtUri } from '../../modules/findChannels'
 import ChannelOverviewCard from "./ChannelOverview";
 import ChannelInteractiveCard from "./ChannelInteractiveCard";
 import SearchBar from './SearchBar'

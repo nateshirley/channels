@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Row, Col, Container } from "react-bootstrap";
-import { ChannelOverview, ChannelAttribution } from "../../modules/channels"
+import { ChannelOverview, ChannelAttribution } from "../../modules/findChannels"
 
 interface Props {
     overview: ChannelOverview,

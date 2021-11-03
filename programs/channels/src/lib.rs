@@ -7,9 +7,9 @@ use anchor_token_metadata;
 use spl_token::instruction::AuthorityType;
 use spl_token_metadata;
 
-declare_id!("WczqDK2L6bHkQVwrZuSmKFyUvgVTHtgE4zsGfQ1wmfi");
+declare_id!("DoFrvHMqrtWmkqnsG61c3myUE5QZkNCCXVaWi7a7PuiG");
 const MINT_AUTH_SEED: &[u8] = b"authority";
-const CHANNEL_SEED: &[u8] = b"channel";
+const CHANNEL_ATTRIBUTION_SEED: &[u8] = b"channel";
 
 #[program]
 pub mod channels {
@@ -19,7 +19,10 @@ pub mod channels {
         _creation_attribution_bump: u8,
         _subscription_attribution_bump: u8,
         _mint_auth_bump: u8,
-        metadata_inputs: MetadataInputs,
+        _name_attribution_bump: u8,
+        name: String,
+        symbol: String,
+        uri: String,
     ) -> ProgramResult {
         let seeds = &[&MINT_AUTH_SEED[..], &[_mint_auth_bump]];
 
@@ -40,9 +43,9 @@ pub mod channels {
             ctx.accounts
                 .into_create_creation_metadata_context()
                 .with_signer(&[&seeds[..]]),
-            metadata_inputs.name.clone(),
-            metadata_inputs.symbol.clone(),
-            metadata_inputs.uri.clone(),
+            name.clone(),
+            symbol.clone(),
+            uri.clone(),
             Some(creators.clone()),
             0,
             true,
@@ -53,21 +56,25 @@ pub mod channels {
             ctx.accounts
                 .into_create_subscription_metadata_context()
                 .with_signer(&[&seeds[..]]),
-            metadata_inputs.name,
-            metadata_inputs.symbol,
-            metadata_inputs.uri,
+            name,
+            symbol,
+            uri,
             Some(creators),
             0,
             true,
             true,
         )?;
 
-        //set data for attribution pda's
+        //set data for mint attribution
         ctx.accounts.creation_attribution.creation_mint = ctx.accounts.creation_mint.key();
         ctx.accounts.creation_attribution.subscription_mint = ctx.accounts.subscription_mint.key();
         ctx.accounts.subscription_attribution.creation_mint = ctx.accounts.creation_mint.key();
         ctx.accounts.subscription_attribution.subscription_mint =
             ctx.accounts.subscription_mint.key();
+
+        //set data for name attribution
+        ctx.accounts.name_attribution.creation_mint = ctx.accounts.creation_mint.key();
+        ctx.accounts.name_attribution.subscription_mint = ctx.accounts.subscription_mint.key();
 
         //mark both accounts w/ primary sale happened to avoid confusion on seller fees
         anchor_token_metadata::update_metadata(
@@ -112,22 +119,14 @@ pub mod channels {
         ctx: Context<UpdateChannelMetadata>,
         _mint_auth_bump: u8,
         _subscription_attribution_bump: u8,
-        update_metadata_inputs: UpdateMetadataInputs,
+        uri: String,
     ) -> ProgramResult {
         let seeds = &[&MINT_AUTH_SEED[..], &[_mint_auth_bump]];
 
         let existing_metadata: spl_token_metadata::state::Metadata =
             try_from_slice_unchecked(&ctx.accounts.creation_metadata.data.borrow()).unwrap();
         let mut new_data: spl_token_metadata::state::Data = existing_metadata.data;
-        if let Some(name) = update_metadata_inputs.name {
-            new_data.name = name;
-        }
-        if let Some(symbol) = update_metadata_inputs.symbol {
-            new_data.symbol = symbol;
-        }
-        if let Some(uri) = update_metadata_inputs.uri {
-            new_data.uri = uri;
-        }
+        new_data.uri = uri;
 
         anchor_token_metadata::update_metadata(
             ctx.accounts
@@ -151,7 +150,7 @@ pub mod channels {
 }
 
 #[derive(Accounts)]
-#[instruction(_creation_attribution_bump: u8, _subscription_attribution_bump: u8, _mint_auth_bump: u8)]
+#[instruction(_creation_attribution_bump: u8, _subscription_attribution_bump: u8, _mint_auth_bump: u8, _name_attribution_bump: u8, name: String)]
 pub struct CreateChannel<'info> {
     #[account(mut)]
     pub creator: Signer<'info>,
@@ -170,7 +169,7 @@ pub struct CreateChannel<'info> {
     pub creation_mint: Account<'info, token::Mint>,
     #[account(
         init,
-        seeds = [CHANNEL_SEED, creation_mint.key().as_ref()],
+        seeds = [CHANNEL_ATTRIBUTION_SEED, creation_mint.key().as_ref()],
         bump = _creation_attribution_bump,
         payer = creator.to_account_info()
     )]
@@ -187,7 +186,7 @@ pub struct CreateChannel<'info> {
     pub subscription_mint: Account<'info, token::Mint>,
     #[account(
         init,
-        seeds = [CHANNEL_SEED, subscription_mint.key().as_ref()],
+        seeds = [CHANNEL_ATTRIBUTION_SEED, subscription_mint.key().as_ref()],
         bump = _subscription_attribution_bump,
         payer = creator.to_account_info()
     )]
@@ -195,6 +194,13 @@ pub struct CreateChannel<'info> {
     //gets validated in the token metadata program
     #[account(mut)]
     pub subscription_metadata: AccountInfo<'info>,
+    #[account(
+        init,
+        seeds = [name.as_bytes()],
+        bump = _name_attribution_bump,
+        payer = creator.to_account_info()
+    )]
+    pub name_attribution: Account<'info, ChannelAttribution>,
     #[account(
         seeds = [MINT_AUTH_SEED],
         bump = _mint_auth_bump,
@@ -213,12 +219,6 @@ pub struct CreateChannel<'info> {
 pub struct ChannelAttribution {
     pub creation_mint: Pubkey,
     pub subscription_mint: Pubkey,
-}
-#[derive(Debug, AnchorSerialize, AnchorDeserialize)]
-pub struct MetadataInputs {
-    pub name: String,
-    pub symbol: String,
-    pub uri: String,
 }
 
 #[derive(Accounts)]
@@ -247,13 +247,6 @@ pub struct Subscribe<'info> {
     pub token_program: Program<'info, token::Token>,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct UpdateMetadataInputs {
-    pub name: Option<String>,
-    pub symbol: Option<String>,
-    pub uri: Option<String>,
-}
-
 #[derive(Accounts)]
 #[instruction(_mint_auth_bump: u8, _subscription_attribution_bump: u8)]
 pub struct UpdateChannelMetadata<'info> {
@@ -272,10 +265,9 @@ pub struct UpdateChannelMetadata<'info> {
     //validated by metadata program
     #[account(mut)]
     pub creation_metadata: AccountInfo<'info>,
-    //need to make sure the susbcription goes with the mint
     pub subscription_mint: Account<'info, token::Mint>,
     #[account(
-        seeds = [CHANNEL_SEED, subscription_mint.key().as_ref()],
+        seeds = [CHANNEL_ATTRIBUTION_SEED, subscription_mint.key().as_ref()],
         bump = _subscription_attribution_bump,
         constraint = subscription_attribution.creation_mint == creation_mint.key(),
         constraint = subscription_attribution.subscription_mint == subscription_mint.key(),
@@ -412,17 +404,6 @@ impl<'info> UpdateChannelMetadata<'info> {
 }
 
 /*
-
-
-
-//ok so it worked when i passed in all the inputs but didn't call the metadata program.
-//now it's not working when i pass in the inputs and also call the metadata program
-//but it does work when don't pass any inputs and call the metadata program once (or even twice)
-//ok so it works with the metadata and everything for one tx. that's only thing in the tx
-//im thinking it must be a capacity issue bc it's doing fine
-
-
-
 
 
 */
