@@ -5,26 +5,14 @@ import { Token, TOKEN_PROGRAM_ID, MintLayout } from '@solana/spl-token';
 import { CHANNEL_PROGRAM_ID, TOKEN_METADATA_PROGRAM_ID, getMetadataAddress, createAssociatedTokenAccountInstruction } from './utils'
 import idl from '../idl.json';
 
+//v3DXj16wzTH8t7UrfgFdPMkAGqFhHZk3kCJExirxsan -- existing owner
 export const createChannelFromProgram = async (name: string, symbol: string, provider: Provider) => {
 
     const defaultUri = "https://nateshirley.github.io/data/channels-default.json";
-    const creation = Keypair.generate();
     const subscription = Keypair.generate();
     const program = new Program(idl as any, CHANNEL_PROGRAM_ID, provider);
     const creator = provider.wallet.publicKey;
 
-    let creationTokenAccount = await getAssociatedTokenAccountAddress(
-        creator,
-        creation.publicKey
-    );
-    let [_creationAttribution, _creationAttributionBump] =
-        await PublicKey.findProgramAddress(
-            [
-                anchorUtils.bytes.utf8.encode("channel"),
-                creation.publicKey.toBuffer(),
-            ],
-            program.programId
-        );
     let [_subscriptionAttribution, _subscriptionAttributionBump] =
         await PublicKey.findProgramAddress(
             [
@@ -33,6 +21,7 @@ export const createChannelFromProgram = async (name: string, symbol: string, pro
             ],
             program.programId
         );
+    let [_subscriptionMetadata, _subscriptionMetadataBump] = await getMetadataAddress(subscription.publicKey);
     let [_mintAuth, _mintAuthBump] = await PublicKey.findProgramAddress(
         [anchorUtils.bytes.utf8.encode("authority")],
         program.programId
@@ -45,12 +34,9 @@ export const createChannelFromProgram = async (name: string, symbol: string, pro
             ],
             program.programId
         );
-    let [_creationMetadata, _creationMetadataBump] = await getMetadataAddress(creation.publicKey);
-    let [_subscriptionMetadata, _subscriptionMetadataBump] = await getMetadataAddress(subscription.publicKey);
 
     const createChannel: any = program.rpc.createChannel;
     const tx = await createChannel(
-        _creationAttributionBump,
         _subscriptionAttributionBump,
         _mintAuthBump,
         _nameAttributionBump,
@@ -60,10 +46,6 @@ export const createChannelFromProgram = async (name: string, symbol: string, pro
         {
             accounts: {
                 creator: creator,
-                creationTokenAccount: creationTokenAccount,
-                creationMint: creation.publicKey,
-                creationAttribution: _creationAttribution,
-                creationMetadata: _creationMetadata,
                 subscriptionMint: subscription.publicKey,
                 subscriptionAttribution: _subscriptionAttribution,
                 subscriptionMetadata: _subscriptionMetadata,
@@ -75,23 +57,6 @@ export const createChannelFromProgram = async (name: string, symbol: string, pro
                 rent: SYSVAR_RENT_PUBKEY,
             },
             instructions: [
-                //create channel mint account
-                SystemProgram.createAccount({
-                    fromPubkey: creator,
-                    newAccountPubkey: creation.publicKey,
-                    space: MintLayout.span,
-                    lamports:
-                        await provider.connection.getMinimumBalanceForRentExemption(MintLayout.span),
-                    programId: TOKEN_PROGRAM_ID,
-                }),
-                //init creation mint account
-                Token.createInitMintInstruction(
-                    TOKEN_PROGRAM_ID,
-                    creation.publicKey,
-                    0,
-                    _mintAuth,
-                    null
-                ),
                 //create subscription mint account
                 SystemProgram.createAccount({
                     fromPubkey: creator,
@@ -109,15 +74,8 @@ export const createChannelFromProgram = async (name: string, symbol: string, pro
                     _mintAuth,
                     null
                 ),
-                //create associated token account for the creation creator
-                createAssociatedTokenAccountInstruction(
-                    creation.publicKey,
-                    creationTokenAccount,
-                    creator,
-                    creator
-                ),
             ],
-            signers: [creation, subscription],
+            signers: [subscription],
         }
     );
     return tx

@@ -54,7 +54,7 @@ function Find(props: GetProvider) {
     const [channelImageLink, setChannelImageLink] = useState("");
     const [channelCreator, setChannelCreator] = useState(SystemProgram.programId)
     const [channelAttribution, setChannelAttribution] = useState({
-        creationMint: SystemProgram.programId,
+        creator: SystemProgram.programId,
         subscriptionMint: SystemProgram.programId
     })
     const [channelTokensForWallet, setChannelTokensForWallet] = useState(emptyChannelTokens())
@@ -70,6 +70,7 @@ function Find(props: GetProvider) {
     const search = async (searchText: string) => {
         const provider = getProvider();
         let decoded = bs58.decode(searchText);
+        //if u can decode it in 32, search by creator wallet, otherwise do it by the name
         if (decoded.length === 32) {
             let publicKey = new PublicKey(searchText);
             let channelAttribution = await fetchChannelAttribtion(publicKey, provider.connection);
@@ -77,7 +78,7 @@ function Find(props: GetProvider) {
                 let [tokenType, attribution] = channelAttribution;
                 setSearchStatus(tokenType);
                 setChannelAttribution({
-                    creationMint: attribution.creationMint,
+                    creator: attribution.creator,
                     subscriptionMint: attribution.subscriptionMint
                 })
                 let overview = await fetchChannelOverview(attribution.subscriptionMint, provider.connection);
@@ -88,7 +89,7 @@ function Find(props: GetProvider) {
                         setChannelImageLink(dataObject.image);
                     }
                 }
-                let creator = await fetchChannelCreator(attribution.creationMint, provider.connection);
+                let creator = await fetchChannelCreator(attribution.creator, provider.connection);
                 if (creator) {
                     setChannelCreator(creator);
                 }

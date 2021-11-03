@@ -3,11 +3,12 @@ import {
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
   TransactionInstruction,
+  Connection,
 } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 export const CHANNEL_PROGRAM_ID = new PublicKey(
-  "DoFrvHMqrtWmkqnsG61c3myUE5QZkNCCXVaWi7a7PuiG"
+  "4awF9VKqak7dFcLaCFsvegkHqDH9CWxJL8ghDbwUGq7w"
 );
 export const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
   "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"

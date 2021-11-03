@@ -1,19 +1,39 @@
 import { Provider, utils } from '@project-serum/anchor';
 import { PublicKey, SystemProgram, Connection, AccountInfo } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import * as BufferLayout from "@solana/buffer-layout"
 import { decodeMetadata } from "./decodeMetadata";
 import { CHANNEL_PROGRAM_ID, TOKEN_METADATA_PROGRAM_ID, getMetadataAddress } from './utils'
+import * as BufferLayout from "@solana/buffer-layout";
+
 
 
 const publicKey = (property: string) => {
     return BufferLayout.blob(32, property);
 };
-export const AttributionLayout = BufferLayout.struct([
+export const ChannelAttributionLayout = BufferLayout.struct([
     BufferLayout.seq(BufferLayout.u8(), 8, "discriminator"),
-    publicKey("creation"),
+    publicKey("creator"),
     publicKey("subscription"),
+    BufferLayout.blob(1, "fromName"),
 ]);
+export const getDecodedAttribution = async (
+    attributionAddress: PublicKey,
+    connection: Connection
+) => {
+    let rawAttribution = await connection.getAccountInfo(attributionAddress);
+    if (rawAttribution) {
+        return decodeAttribution(rawAttribution.data);
+    }
+};
+export const decodeAttribution = (rawAttributionData: Buffer) => {
+    let decodedAttribution = ChannelAttributionLayout.decode(
+        rawAttributionData
+    );
+    return {
+        creator: new PublicKey(decodedAttribution.creator),
+        subscriptionMint: new PublicKey(decodedAttribution.subscription),
+    };
+}
 
 
 export interface ChannelTokens {
@@ -29,7 +49,7 @@ interface SubscriptionToken {
     attribution: ChannelAttribution
 }
 export interface ChannelAttribution {
-    creationMint: PublicKey,
+    creator: PublicKey,
     subscriptionMint: PublicKey
 }
 export interface ChannelOverview {
@@ -40,6 +60,35 @@ export interface ChannelOverview {
     uri: string
 }
 
+
+export const fetchCreatedChannelsForWallet = async (walletAddress: PublicKey, connection: Connection) => {
+    let config = {
+        filters: [
+            {
+                dataSize: 73
+            },
+            {
+                memcmp:
+                {
+                    bytes: walletAddress.toBase58(),
+                    offset: 8
+                }
+            },
+            {
+                memcmp:
+                {
+                    bytes: "1",
+                    offset: 72
+                }
+            },
+        ]
+    }
+    let attributionAccounts = await connection.getProgramAccounts(
+        CHANNEL_PROGRAM_ID,
+        config
+    );
+    return attributionAccounts;
+}
 
 export const getAttributionAddress = async (publicKey: PublicKey) => {
     return await PublicKey.findProgramAddress(
@@ -69,20 +118,7 @@ const getTokenAccountsForWallet = async (walletKey: PublicKey, connection: Conne
     });
     return tokenAccountResponses.value
 }
-const getDecodedAttribution = async (attributionAddress: PublicKey, connection: Connection) => {
-    let rawAttribution = await connection.getAccountInfo(
-        attributionAddress
-    );
-    if (rawAttribution) {
-        let decodedAttribution = AttributionLayout.decode(
-            rawAttribution.data
-        );
-        return {
-            creationMint: new PublicKey(decodedAttribution.creation),
-            subscriptionMint: new PublicKey(decodedAttribution.subscription)
-        }
-    }
-}
+
 
 export const fetchChannelTokensForWallet = async (walletKey: PublicKey, connection: Connection) => {
     let tokenAccountResponses = await getTokenAccountsForWallet(walletKey, connection);

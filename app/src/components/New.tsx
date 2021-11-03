@@ -8,7 +8,9 @@ import { Program } from '@project-serum/anchor';
 import idl from '../idl.json';
 import { css } from "@emotion/react";
 import MoonLoader from "react-spinners/MoonLoader";
-import { createChannelFromProgram } from '../modules/newChannels'
+import { createChannelFromProgram, } from '../modules/newChannels'
+import { decodeAttribution, fetchCreatedChannelsForWallet } from "../modules/findChannels";
+import { CHANNEL_PROGRAM_ID } from '../modules/utils';
 
 interface GetProvider {
     getProvider: () => Provider
@@ -34,6 +36,15 @@ function New(props: GetProvider) {
         const provider = props.getProvider()
         let tx = await createChannelFromProgram(name, symbol, provider);
         console.log("create channel tx ", tx);
+    }
+
+    const fetchChannels = async () => {
+        const connection = props.getProvider().connection;
+        const walletAddress = wallet.publicKey;
+        if (!walletAddress) { return }
+        let accounts = await fetchCreatedChannelsForWallet(walletAddress, connection);
+        let attribution = decodeAttribution(accounts[0].account.data);
+        console.log(attribution.subscriptionMint.toBase58());
     }
 
     let body = null;
@@ -62,6 +73,7 @@ function New(props: GetProvider) {
                         className="default-input"
                     />
                 </div>
+                <button className="default-button make" onClick={fetchChannels}>get created</button>
                 {isLoading
                     ? <div style={{ marginTop: "24px" }}><MoonLoader loading={true} size={31} css={override} /></div>
                     : <button className="default-button make" onClick={createChannel}>make new pack</button>
