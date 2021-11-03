@@ -2,11 +2,11 @@
 import { PublicKey, SystemProgram, Keypair, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
 import { Program, utils as anchorUtils, Provider } from '@project-serum/anchor';
 import { Token, TOKEN_PROGRAM_ID, MintLayout } from '@solana/spl-token';
-import { CHANNEL_PROGRAM_ID, TOKEN_METADATA_PROGRAM_ID, getMetadataAddress, createAssociatedTokenAccountInstruction } from './utils'
+import { CHANNEL_PROGRAM_ID, TOKEN_METADATA_PROGRAM_ID, CHANNEL_MINT_AUTH, getMetadataAddress, createAssociatedTokenAccountInstruction } from './utils'
 import idl from '../idl.json';
 
 //v3DXj16wzTH8t7UrfgFdPMkAGqFhHZk3kCJExirxsan -- existing owner
-export const createChannelFromProgram = async (name: string, symbol: string, provider: Provider) => {
+export const createChannel = async (name: string, symbol: string, provider: Provider) => {
 
     const defaultUri = "https://nateshirley.github.io/data/channels-default.json";
     const subscription = Keypair.generate();
@@ -81,12 +81,3 @@ export const createChannelFromProgram = async (name: string, symbol: string, pro
     return tx
 }
 
-export const getAssociatedTokenAccountAddress = async (owner: PublicKey, mint: PublicKey) => {
-    let associatedProgramId = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
-    return (
-        await PublicKey.findProgramAddress(
-            [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
-            associatedProgramId
-        )
-    )[0];
-};

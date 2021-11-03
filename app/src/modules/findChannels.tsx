@@ -2,7 +2,7 @@ import { Provider, utils } from '@project-serum/anchor';
 import { PublicKey, SystemProgram, Connection, AccountInfo } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { decodeMetadata } from "./decodeMetadata";
-import { CHANNEL_PROGRAM_ID, TOKEN_METADATA_PROGRAM_ID, getMetadataAddress } from './utils'
+import { CHANNEL_PROGRAM_ID, TOKEN_METADATA_PROGRAM_ID, getMetadataAddress, toDisplayString } from './utils'
 import * as BufferLayout from "@solana/buffer-layout";
 
 
@@ -145,11 +145,11 @@ isInitialized: true
 mintAuthority: null
 supply: "1"
 */
-export const fetchChannelOverview = async (subscriberMint: PublicKey, connection: Connection) => {
-    let accountData: any = (await connection.getParsedAccountInfo(subscriberMint)).value?.data;
+export const fetchChannelOverview = async (subscriptionMint: PublicKey, connection: Connection) => {
+    let accountData: any = (await connection.getParsedAccountInfo(subscriptionMint)).value?.data;
     if (accountData) {
         let parsedAccountInfo = accountData.parsed.info;
-        const [metadataAddress, _bump] = await getMetadataAddress(subscriberMint);
+        const [metadataAddress, _bump] = await getMetadataAddress(subscriptionMint);
         const accountInfo = await connection.getAccountInfo(metadataAddress);
         if (accountInfo && isMetadataV1Account(accountInfo)) {
             const metadata = decodeMetadata(accountInfo.data);
@@ -157,16 +157,12 @@ export const fetchChannelOverview = async (subscriberMint: PublicKey, connection
                 name: metadata.data.name,
                 symbol: metadata.data.symbol,
                 subscriberCount: parsedAccountInfo.supply,
-                subscriberMintDisplayString: toDisplayString(subscriberMint),
+                subscriberMintDisplayString: toDisplayString(subscriptionMint),
                 uri: metadata.data.uri
             }
             return overview
         }
     }
-}
-export const toDisplayString = (publicKey: PublicKey, sliceLength: number = 4) => {
-    let b58 = publicKey.toBase58();
-    return (b58.slice(0, sliceLength) + "..." + b58.slice(b58.length - sliceLength, b58.length));
 }
 
 export const fetchDataObjectAtUri = async (uri: string): Promise<any | undefined> => {

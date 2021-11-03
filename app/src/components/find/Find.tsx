@@ -10,12 +10,10 @@ import { fetchChannelAttributionByMint, ChannelOverview, fetchChannelOverview, f
 import ChannelOverviewCard from "./ChannelOverview";
 import ChannelInteractiveCard from "./ChannelInteractiveCard";
 import SearchBar from './SearchBar'
+import SubscriptionsForWallet from './SubscriptionsForWallet'
+import { getConnection } from '../../modules/utils'
 //import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
-
-interface GetProvider {
-    getProvider: () => Provider
-}
 
 const emptyChannelOverview = (): ChannelOverview => {
     return {
@@ -40,11 +38,11 @@ const Privilege = {
     NONE: "none"
 }
 
-function Find(props: GetProvider) {
+function Find() {
     const wallet = useWallet();
-    const getProvider = props.getProvider;
     const [searchStatus, setSearchStatus] = useState(Searches.NONE);
     const history = useHistory();
+    const connection = getConnection();
     const [searchText, setSearchText] = useState('');
     const [channelOverview, setChannelOverview] = useState(emptyChannelOverview());
     const [channelImageLink, setChannelImageLink] = useState("");
@@ -64,8 +62,7 @@ function Find(props: GetProvider) {
         search(searchText);
     }
     const assertNewOverview = async (newAttribution: ChannelAttribution) => {
-        const provider = getProvider();
-        let overview = await fetchChannelOverview(newAttribution.subscriptionMint, provider.connection);
+        let overview = await fetchChannelOverview(newAttribution.subscriptionMint, connection);
         if (overview) {
             setChannelOverview(overview);
             let dataObject = await fetchDataObjectAtUri(overview.uri);
@@ -75,11 +72,16 @@ function Find(props: GetProvider) {
         }
     }
 
+    const seeExample = () => {
+        const channel5 = "Channel 5";
+        history.push("?key=" + channel5);
+        search(channel5);
+    }
+
     const search = async (searchText: string) => {
-        const provider = getProvider();
         try {
             let publicKey = new PublicKey(searchText);
-            let newAttribution = await fetchChannelAttributionByMint(publicKey, provider.connection);
+            let newAttribution = await fetchChannelAttributionByMint(publicKey, connection);
             if (newAttribution) {
                 setSearchStatus(Searches.CHANNEL);
                 setChannelAttribution(newAttribution)
@@ -87,35 +89,35 @@ function Find(props: GetProvider) {
             } else {
                 setSearchStatus(Searches.WALLET);
                 console.log("search is wallet");
-                fetchCreatedChannelsForWallet(publicKey, provider.connection).then((createdChannels) => {
+                fetchCreatedChannelsForWallet(publicKey, connection).then((createdChannels) => {
                     setCreatedChannelsForWallet(createdChannels);
                     console.log(createdChannels);
                 });
-                fetchSubscriptionsForWallet(publicKey, provider.connection).then((subscriptions) => {
+                fetchSubscriptionsForWallet(publicKey, connection).then((subscriptions) => {
                     setSubscriptionsForWallet(subscriptions);
                     console.log(subscriptions);
-                })
+                });
             }
-        } catch {
-            console.log("caught")
-            let newAttribution = await fetchChannelAttributionByName(searchText, provider.connection);
+        } catch { //search with the name string
+            let newAttribution = await fetchChannelAttributionByName(searchText, connection);
             if (newAttribution) {
                 setSearchStatus(Searches.CHANNEL);
                 setChannelAttribution(newAttribution)
                 assertNewOverview(newAttribution);
+            } else {
+                setSearchStatus(Searches.NONE);
             }
         }
-        //if u can decode it in 32, search by creator wallet, otherwise do it by the name
-        // if (decoded.length === 32) {
-        //     let publicKey = new PublicKey(searchText);
-
-        // } else { //search by name
-
-        //     console.log("not searching bc query doesn't match type")
-        // }
     }
 
-
+    const didSuccessfullySubscribe = async () => {
+        assertNewOverview(channelAttribution);
+        if (wallet.connected && wallet.publicKey) {
+            fetchSubscriptionsForWallet(wallet.publicKey, connection).then((subscriptions) => {
+                setSubscriptionsForWallet(subscriptions);
+            });
+        }
+    }
 
     //redo the search if user presses back. should probably be in state, but fuck it
     useEffect(() => {
@@ -148,27 +150,27 @@ function Find(props: GetProvider) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-
     //determine privilege
     useEffect(() => {
-        const isWalletSubscriber = () => {
+        const isWalletSubscribed = () => {
             if (wallet.connected) {
-                subscriptionsForWallet.forEach((attribution) => {
+                for (const attribution of subscriptionsForWallet) {
                     if (attribution.subscriptionMint.equals(channelAttribution.subscriptionMint)) {
                         return true;
                     }
-                });
+                }
             }
             return false
         }
-        if (wallet.connected && (searchStatus === Searches.CHANNEL)) {
-            if (wallet.publicKey && channelAttribution.creator.equals(wallet.publicKey)) {
+        if (wallet.connected && wallet.publicKey && (searchStatus === Searches.CHANNEL)) {
+            if (channelAttribution.creator.equals(wallet.publicKey)) {
                 setChannelPrivilege(Privilege.EDIT)
                 return
-            } else if (isWalletSubscriber()) {
+            } else if (isWalletSubscribed()) {
                 setChannelPrivilege(Privilege.SUBSCRIBED);
                 return
-            } else {
+            }
+            else {
                 setChannelPrivilege(Privilege.SUBSCRIBE);
                 return
             }
@@ -176,41 +178,50 @@ function Find(props: GetProvider) {
         setChannelPrivilege(Privilege.NONE);
     }, [wallet.connected, wallet.publicKey, channelAttribution, subscriptionsForWallet, searchStatus])
 
+    useEffect(() => {
+        const connection = getConnection();
+        if (wallet.connected && wallet.publicKey) {
+            fetchSubscriptionsForWallet(wallet.publicKey, connection).then((subscriptions) => {
+                setSubscriptionsForWallet(subscriptions);
+            });
+        } else {
+            setSubscriptionsForWallet(emptyAttribution());
+        }
+    }, [channelAttribution.subscriptionMint, wallet.connected, wallet.publicKey])
 
+    const clickedChannel = () => {
 
+    }
+
+    //im gonna do an example that's just channel 5
     let infoCards = null;
     switch (searchStatus) {
         case Searches.CHANNEL:
             infoCards = (
                 <div>
                     <ChannelOverviewCard overview={channelOverview} imageLink={channelImageLink} attribution={channelAttribution} />
-                    <ChannelInteractiveCard overview={channelOverview} attribution={channelAttribution} privilege={channelPrivilege} getProvider={getProvider} />
+                    <ChannelInteractiveCard overview={channelOverview} attribution={channelAttribution} privilege={channelPrivilege} didSuccessfullySubscribe={didSuccessfullySubscribe} />
                 </div>
             )
             break;
         case Searches.WALLET:
             infoCards = (
                 <div>
+                    <SubscriptionsForWallet subscriptionsForWallet={subscriptionsForWallet} clickedChannel={clickedChannel} />
                 </div>
             )
             break;
         default:
-            // if (randomPacks.length > 0) {
-            //     )
-            // } else {
             infoCards = (
                 <div>
-
+                    <button onClick={seeExample}>see an example</button>
                 </div>
             )
-        //}
-
-        //add show random packs
     }
     return (
         <div className="component-parent">
             <div className="component-header">Find a Channel</div>
-            <SearchBar handleSearchChange={handleSearchChange} searchText={searchText} />
+            <SearchBar handleSearchChange={handleSearchChange} searchText={searchText} didPressSearch={didPressSearch} />
             <button className="default-button search" onClick={didPressSearch}>search</button>
             {infoCards}
         </div>

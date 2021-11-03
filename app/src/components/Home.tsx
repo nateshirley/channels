@@ -3,11 +3,8 @@ import "../Global.css";
 import homeLogo from "./../assets/channelsHome.jpeg"
 import { Provider } from '@project-serum/anchor';
 
-interface GetProvider {
-    getProvider: () => Provider
-}
 
-function Home(props: GetProvider) {
+function Home() {
     return (
         <div className="component-parent">
             <img src={homeLogo} alt="logo" className="home-logo" />

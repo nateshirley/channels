@@ -8,20 +8,18 @@ import { Program } from '@project-serum/anchor';
 import idl from '../idl.json';
 import { css } from "@emotion/react";
 import MoonLoader from "react-spinners/MoonLoader";
-import { createChannelFromProgram, } from '../modules/newChannels'
+import { createChannel, } from '../modules/newChannels'
 import { decodeAttribution, fetchCreatedChannelsForWallet } from "../modules/findChannels";
-import { CHANNEL_PROGRAM_ID } from '../modules/utils';
+import { getProvider } from '../modules/utils'
 
-interface GetProvider {
-    getProvider: () => Provider
-}
+
 const override = css`
 display: block;
 margin: 0 auto;
 border-color: black;
 `;
 
-function New(props: GetProvider) {
+function New() {
     const [name, setName] = useState('');
     const [symbol, setSymbol] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -29,21 +27,19 @@ function New(props: GetProvider) {
     const history = useHistory();
 
 
-    const createChannel = async () => {
+    const didPressCreateChannel = async () => {
         if (name.length < 1 || symbol.length < 1) {
             return
         }
-        const provider = props.getProvider()
-        let tx = await createChannelFromProgram(name, symbol, provider);
+        setIsLoading(true);
+        const provider = getProvider(wallet);
+        let tx = await createChannel(name, symbol, provider);
         console.log("create channel tx ", tx);
-    }
-
-    const fetchChannels = async () => {
-        const connection = props.getProvider().connection;
-        const walletAddress = wallet.publicKey;
-        if (!walletAddress) { return }
-        let accounts = await fetchCreatedChannelsForWallet(walletAddress, connection);
-        console.log(accounts[0].subscriptionMint.toBase58());
+        //push user to pack details page with mint id
+        history.replace("/find?key=" + name)
+        setName('');
+        setSymbol('');
+        setIsLoading(false);
     }
 
     let body = null;
@@ -72,10 +68,9 @@ function New(props: GetProvider) {
                         className="default-input"
                     />
                 </div>
-                <button className="default-button make" onClick={fetchChannels}>get created</button>
                 {isLoading
                     ? <div style={{ marginTop: "24px" }}><MoonLoader loading={true} size={31} css={override} /></div>
-                    : <button className="default-button make" onClick={createChannel}>make new pack</button>
+                    : <button className="default-button make" onClick={didPressCreateChannel}>start new channel</button>
                 }
             </div>
         )

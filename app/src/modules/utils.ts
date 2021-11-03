@@ -4,9 +4,14 @@ import {
   SYSVAR_RENT_PUBKEY,
   TransactionInstruction,
   Connection,
+  Commitment,
 } from "@solana/web3.js";
+import { Provider } from "@project-serum/anchor";
+import { WalletContextState } from "@solana/wallet-adapter-react";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
-
+export const CHANNEL_MINT_AUTH = new PublicKey(
+  "6Hugr12bLkn62Yn732ej6PNrkFuvgVTdiQh4gp2g2NMp"
+);
 export const CHANNEL_PROGRAM_ID = new PublicKey(
   "4awF9VKqak7dFcLaCFsvegkHqDH9CWxJL8ghDbwUGq7w"
 );
@@ -16,6 +21,32 @@ export const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
 export const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
   "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 );
+export const toDisplayString = (
+  publicKey: PublicKey,
+  sliceLength: number = 4
+) => {
+  let b58 = publicKey.toBase58();
+  return (
+    b58.slice(0, sliceLength) +
+    "..." +
+    b58.slice(b58.length - sliceLength, b58.length)
+  );
+};
+
+export const getProvider = (withWallet: WalletContextState) => {
+  const commitment: Commitment = "processed";
+  let confirmOptions = { preflightCommitment: commitment };
+  let wallet: any = withWallet;
+  const provider = new Provider(getConnection(), wallet, confirmOptions);
+  return provider;
+};
+
+export const getConnection = () => {
+  const network =
+    "https://lingering-lingering-mountain.solana-devnet.quiknode.pro/fbbd36836095686bd9f580212e675aaab88204c9/"; //clusterApiUrl('devnet');
+  const commitment: Commitment = "processed";
+  return new Connection(network, commitment);
+};
 
 export const getMetadataAddress = async (mint: PublicKey) => {
   return await PublicKey.findProgramAddress(
