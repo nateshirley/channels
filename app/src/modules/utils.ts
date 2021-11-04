@@ -13,7 +13,7 @@ export const CHANNEL_MINT_AUTH = new PublicKey(
   "6Hugr12bLkn62Yn732ej6PNrkFuvgVTdiQh4gp2g2NMp"
 );
 export const CHANNEL_PROGRAM_ID = new PublicKey(
-  "4awF9VKqak7dFcLaCFsvegkHqDH9CWxJL8ghDbwUGq7w"
+  "B289W9c9eYntT2hpX4e3bE1F6tib2kfffvov7pPZ8w2Q"
 );
 export const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
   "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"

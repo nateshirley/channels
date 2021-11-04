@@ -5,7 +5,15 @@ import { Token, TOKEN_PROGRAM_ID, MintLayout } from '@solana/spl-token';
 import { CHANNEL_PROGRAM_ID, TOKEN_METADATA_PROGRAM_ID, CHANNEL_MINT_AUTH, getMetadataAddress, createAssociatedTokenAccountInstruction } from './utils'
 import idl from '../idl.json';
 
-//v3DXj16wzTH8t7UrfgFdPMkAGqFhHZk3kCJExirxsan -- existing owner
+
+const formatName = (name: string) => {
+    name.replace(/ /g, '');
+    if (name.length > 16) {
+        return "";
+    }
+    return name.toLowerCase();
+}
+
 export const createChannel = async (name: string, symbol: string, provider: Provider) => {
 
     const defaultUri = "https://nateshirley.github.io/data/channels-default.json";
@@ -13,27 +21,26 @@ export const createChannel = async (name: string, symbol: string, provider: Prov
     const program = new Program(idl as any, CHANNEL_PROGRAM_ID, provider);
     const creator = provider.wallet.publicKey;
 
-    let [_subscriptionAttribution, _subscriptionAttributionBump] =
-        await PublicKey.findProgramAddress(
-            [
-                anchorUtils.bytes.utf8.encode("channel"),
-                subscription.publicKey.toBuffer(),
-            ],
-            program.programId
-        );
-    let [_subscriptionMetadata, _subscriptionMetadataBump] = await getMetadataAddress(subscription.publicKey);
+    let [_subscriptionAttribution, _subscriptionAttributionBump] = await PublicKey.findProgramAddress(
+        [
+            anchorUtils.bytes.utf8.encode("subscription"),
+            subscription.publicKey.toBuffer(),
+        ],
+        program.programId
+    );
     let [_mintAuth, _mintAuthBump] = await PublicKey.findProgramAddress(
         [anchorUtils.bytes.utf8.encode("authority")],
         program.programId
     );
-    console.log(_mintAuth, _mintAuthBump);
-    let [_nameAttribution, _nameAttributionBump] =
-        await PublicKey.findProgramAddress(
-            [
-                anchorUtils.bytes.utf8.encode(name.toLowerCase()),
-            ],
-            program.programId
-        );
+    let [_subscriptionMetadata, _subscriptionMetadataBump] = await getMetadataAddress(subscription.publicKey);
+    //console.log(_mintAuth, _mintAuthBump);
+    let [_nameAttribution, _nameAttributionBump] = await PublicKey.findProgramAddress(
+        [
+            anchorUtils.bytes.utf8.encode("name"),
+            anchorUtils.bytes.utf8.encode(formatName(name)),
+        ],
+        program.programId
+    );
 
     const createChannel: any = program.rpc.createChannel;
     const tx = await createChannel(

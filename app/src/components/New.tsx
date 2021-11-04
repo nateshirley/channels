@@ -9,7 +9,6 @@ import idl from '../idl.json';
 import { css } from "@emotion/react";
 import MoonLoader from "react-spinners/MoonLoader";
 import { createChannel, } from '../modules/newChannels'
-import { decodeAttribution, fetchCreatedChannelsForWallet } from "../modules/findChannels";
 import { getProvider } from '../modules/utils'
 
 
@@ -23,6 +22,7 @@ function New() {
     const [name, setName] = useState('');
     const [symbol, setSymbol] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [showSpaceError, setShowSpaceError] = useState(false);
     const wallet = useWallet();
     const history = useHistory();
 
@@ -35,12 +35,25 @@ function New() {
         const provider = getProvider(wallet);
         let tx = await createChannel(name, symbol, provider);
         console.log("create channel tx ", tx);
-        //push user to pack details page with mint id
-        history.replace("/find?key=" + name)
+        //push user to details page with mint id
+        let newChannel = name;
         setName('');
         setSymbol('');
         setIsLoading(false);
+        history.replace("/find?key=" + newChannel);
     }
+
+    const onKeyPress = (event: any) => {
+        console.log(event);
+        if (event.key === " ") {
+            event.preventDefault();
+            setShowSpaceError(true);
+        } else {
+            setShowSpaceError(false);
+        }
+    }
+
+
 
     let body = null;
     if (!wallet.connected) {
@@ -52,12 +65,17 @@ function New() {
     } else {
         body = (
             <div>
+                {showSpaceError
+                    ? <div>no spaces</div>
+                    : <div>&nbsp;</div>
+                }
                 <div>
                     <input
                         placeholder="channel name"
                         onChange={e => setName(e.target.value)}
                         value={name}
                         className="default-input"
+                        onKeyPress={onKeyPress}
                     />
                 </div>
                 <div>
@@ -66,11 +84,12 @@ function New() {
                         onChange={e => setSymbol(e.target.value)}
                         value={symbol}
                         className="default-input"
+                        onKeyPress={onKeyPress}
                     />
                 </div>
                 {isLoading
                     ? <div style={{ marginTop: "24px" }}><MoonLoader loading={true} size={31} css={override} /></div>
-                    : <button className="default-button make" onClick={didPressCreateChannel}>start new channel</button>
+                    : <button className="button start-new" onClick={didPressCreateChannel}>start new channel</button>
                 }
             </div>
         )

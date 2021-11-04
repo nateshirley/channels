@@ -6,9 +6,10 @@ use anchor_spl::token;
 use anchor_token_metadata;
 use spl_token_metadata;
 
-declare_id!("4awF9VKqak7dFcLaCFsvegkHqDH9CWxJL8ghDbwUGq7w");
+declare_id!("B289W9c9eYntT2hpX4e3bE1F6tib2kfffvov7pPZ8w2Q");
 const MINT_AUTH_SEED: &[u8] = b"authority";
-const CHANNEL_ATTRIBUTION_SEED: &[u8] = b"channel";
+const SUBSCRIPTION_ATTRIBUTION_SEED: &[u8] = b"subscription";
+const NAME_ATTRIBUTION_SEED: &[u8] = b"name";
 
 #[program]
 pub mod channels {
@@ -23,17 +24,18 @@ pub mod channels {
         uri: String,
     ) -> ProgramResult {
         let seeds = &[&MINT_AUTH_SEED[..], &[_mint_auth_bump]];
+        let mut formatted_name = name.clone();
+        formatted_name.retain(|c| !c.is_whitespace());
 
-        //set data for mint attribution
+        //set data for subscription mint attribution
         ctx.accounts.subscription_attribution.creator = ctx.accounts.creator.key();
         ctx.accounts.subscription_attribution.subscription_mint =
             ctx.accounts.subscription_mint.key();
-        ctx.accounts.subscription_attribution.from_name = false;
+        ctx.accounts.subscription_attribution.name = formatted_name.clone();
 
-        //set data for name attribution
+        // //set data for name attribution
         ctx.accounts.name_attribution.creator = ctx.accounts.creator.key();
         ctx.accounts.name_attribution.subscription_mint = ctx.accounts.subscription_mint.key();
-        ctx.accounts.name_attribution.from_name = true;
 
         let creators = vec![spl_token_metadata::state::Creator {
             address: ctx.accounts.mint_auth.key(),
@@ -45,7 +47,7 @@ pub mod channels {
             ctx.accounts
                 .into_create_subscription_metadata_context()
                 .with_signer(&[&seeds[..]]),
-            name,
+            formatted_name,
             symbol,
             uri,
             Some(creators),
@@ -54,7 +56,7 @@ pub mod channels {
             true,
         )?;
 
-        // //mark w/ primary sale happened to avoid confusion on seller fees
+        //mark w/ primary sale happened to avoid confusion on seller fees
         anchor_token_metadata::update_metadata(
             ctx.accounts
                 .into_update_subscription_metadata_context()
@@ -103,6 +105,19 @@ pub mod channels {
     }
 }
 
+trait FormatForAttribution {
+    fn format_for_attribution(&self) -> Self;
+}
+//need to add some error handling to the front end
+impl FormatForAttribution for String {
+    fn format_for_attribution(&self) -> Self {
+        let mut no_white = self.clone();
+        no_white.make_ascii_lowercase();
+        no_white.retain(|c| !c.is_whitespace());
+        return no_white;
+    }
+}
+
 #[derive(Accounts)]
 #[instruction(_subscription_attribution_bump: u8, _mint_auth_bump: u8, _name_attribution_bump: u8, name: String)]
 pub struct CreateChannel<'info> {
@@ -118,21 +133,22 @@ pub struct CreateChannel<'info> {
     pub subscription_mint: Account<'info, token::Mint>,
     #[account(
         init,
-        seeds = [CHANNEL_ATTRIBUTION_SEED, subscription_mint.key().as_ref()],
+        seeds = [SUBSCRIPTION_ATTRIBUTION_SEED, subscription_mint.key().as_ref()],
         bump = _subscription_attribution_bump,
-        payer = creator.to_account_info()
+        space = 92,
+        payer = creator.to_account_info(),
     )]
-    pub subscription_attribution: Account<'info, ChannelAttribution>,
+    pub subscription_attribution: Account<'info, SubscriptionAttribution>,
     //gets validated in the token metadata program
     #[account(mut)]
     pub subscription_metadata: AccountInfo<'info>,
     #[account(
         init,
-        seeds = [name.to_ascii_lowercase().as_bytes()],
+        seeds = [NAME_ATTRIBUTION_SEED, name.format_for_attribution().as_bytes()],
         bump = _name_attribution_bump,
         payer = creator.to_account_info()
     )]
-    pub name_attribution: Account<'info, ChannelAttribution>,
+    pub name_attribution: Account<'info, NameAttribution>,
     #[account(
         seeds = [MINT_AUTH_SEED],
         bump = _mint_auth_bump,
@@ -144,15 +160,29 @@ pub struct CreateChannel<'info> {
     token_metadata_program: AccountInfo<'info>,
     pub rent: Sysvar<'info, Rent>,
 }
-
-//8 + 32 + 32 = 72 bytes
+//8 + 32 + 32 = 72 byte
+//string is 4 byte setup, plus 1 byte per character. we are doing 16 char max = 20 bytes for the string
+//total 92 bytes
 #[account]
 #[derive(Default)]
-pub struct ChannelAttribution {
+pub struct SubscriptionAttribution {
     pub creator: Pubkey,
     pub subscription_mint: Pubkey,
-    pub from_name: bool,
+    pub name: String,
 }
+#[account]
+#[derive(Default)]
+pub struct NameAttribution {
+    pub creator: Pubkey,
+    pub subscription_mint: Pubkey,
+}
+
+/*
+with just the pubkey, u get allocated 40 bytes --- 32 for pk + 1 for discriminator
+if you do a 60 byte forced storage, there's room for 16 characters
+so you have to do chars + 4
+tests confirm this
+*/
 
 #[derive(Accounts)]
 #[instruction(_mint_auth_bump: u8)]
@@ -186,12 +216,12 @@ pub struct UpdateChannelMetadata<'info> {
     pub creator: Signer<'info>,
     pub subscription_mint: Account<'info, token::Mint>,
     #[account(
-        seeds = [CHANNEL_ATTRIBUTION_SEED, subscription_mint.key().as_ref()],
+        seeds = [SUBSCRIPTION_ATTRIBUTION_SEED, subscription_mint.key().as_ref()],
         bump = _subscription_attribution_bump,
         constraint = subscription_attribution.creator == creator.key(),
         constraint = subscription_attribution.subscription_mint == subscription_mint.key(),
     )]
-    pub subscription_attribution: Account<'info, ChannelAttribution>,
+    pub subscription_attribution: Account<'info, SubscriptionAttribution>,
     //validated by metadata program -- it will check that the metadata matches the mint  //https://github.com/metaplex-foundation/metaplex/blob/master/rust/token-metadata/program/src/utils.rs#L828
     #[account(mut)]
     pub subscription_metadata: AccountInfo<'info>,

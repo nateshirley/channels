@@ -4,8 +4,165 @@
   margin-right: auto;
   width: 90%;
   max-width: 540px;
-  font-family: "IBM Plex Serif", serif;
+  font-family: "IBM Plex Sans", serif;
   font-style: normal;
   font-weight: 600;
   margin-bottom: 150px;
+}
+
+.component-header {
+  font-size: 44px;
+  font-weight: 900;
+  margin-bottom: 30px;
+}
+
+.home-logo {
+  margin-left: auto;
+  margin-right: auto;
+  width: 90%;
+  max-width: 1100px;
+  display: block;
+}
+
+.home-info {
+  font-size: 22px;
+  text-align: center;
+  font-weight: 600;
+  width: 100%;
+  margin-top: 5px;
+}
+
+.button {
+  font-family: "M PLUS Rounded 1c", sans-serif;
+  color: black;
+  text-align: center;
+}
+
+.home-button-group {
+  display: flex;
+  justify-content: center;
+  margin-top: 35px;
+}
+.button.home {
+  width: 163px;
+  height: 55px;
+  line-height: 47px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 16px;
+  margin-top: 5px;
+}
+.button.home:hover {
+  color: black;
+}
+.button.home.find {
+  background-color: white;
+  margin-right: 15px;
+  border: 3.5px solid white;
+}
+.button.home.find:hover {
+  background-color: #f5f5ff;
+}
+.button.home.start {
+  border: 3.5px solid #5060ee;
+  background-color: white;
+  margin-left: 15px;
+}
+.button.home.start:hover {
+  background-color: #f5f5ff;
+}
+.home-subheader {
+  margin-top: 70px;
+  font-size: 16px;
+}
+.home-body {
+  margin-top: 14px;
+  padding: 26px 30px 26px 30px;
+  background-color: #d9ddff;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.default-input {
+  width: 80%;
+  height: 40px;
+  border-radius: 2px;
+  border-width: 0px;
+  background-color: white;
+  margin-top: 10px;
+  font-size: 16px;
+  font-family: "M PLUS Rounded 1c", sans-serif;
+  font-weight: 600;
+  padding-left: 22px;
+}
+.default-input:focus {
+  outline: none !important;
+  border: 1px solid #1f5dff;
+  box-shadow: 0 0 5px #b4b4b4;
+}
+
+.button.start-new {
+  margin-top: 30px;
+  font-weight: 600;
+}
+.button.search {
+  font-weight: 500;
+  height: 40px;
+  margin-left: 10px;
+}
+.overview-header {
+  font-weight: 800;
+  font-size: 22px;
+  margin-top: 59px;
+}
+.overview-card {
+  margin-top: 0px;
+  padding: 23px 0px 23px 0px;
+}
+.overview-row {
+  overflow: hidden;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.overview-labels {
+  overflow: hidden;
+  white-space: nowrap;
+  font-weight: 500;
+  color: #777777;
+}
+
+.subscriber {
+  background-color: #3adeb7;
+  color: white;
+  line-height: 50px;
+  font-size: 22px;
+  padding-left: 15px;
+  width: 190px;
+}
+.creator {
+  background-color: #3a4df9;
+  color: white;
+  line-height: 30px;
+  font-size: 22px;
+  padding: 12px 22px 12px 22px;
+  width: 210px;
+}
+.channel-example {
+  background-color: #ccd1ff;
+  border: none;
+  text-decoration: underline;
+  margin: 80px auto 0px auto;
+  display: block;
+}
+.subscriptions-header {
+  margin-top: 40px;
+}
+.wallet-subscriptions {
+  margin-bottom: 20px;
+}
+.subscribed-channel {
+  background-color: #ccd1ff;
+  border: none;
+  text-decoration: underline;
+  font-weight: 600;
 }

@@ -6,7 +6,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useHistory } from 'react-router-dom';
 import bs58 from 'bs58';
 import qs from "qs";
-import { fetchChannelAttributionByMint, ChannelOverview, fetchChannelOverview, fetchChannelAttributionByName, fetchDataObjectAtUri, ChannelAttribution, fetchCreatedChannelsForWallet, fetchSubscriptionsForWallet } from '../../modules/findChannels'
+import { fetchChannelAttributionBySubscription, ChannelOverview, fetchChannelOverview, fetchChannelAttributionByName, fetchDataObjectAtUri, ChannelAttribution, ChannelAttributionWithName, fetchCreatedChannelsForWallet, fetchSubscriptionsForWallet } from '../../modules/findChannels'
 import ChannelOverviewCard from "./ChannelOverview";
 import ChannelInteractiveCard from "./ChannelInteractiveCard";
 import SearchBar from './SearchBar'
@@ -25,6 +25,7 @@ const emptyChannelOverview = (): ChannelOverview => {
     }
 }
 const emptyAttribution = (): ChannelAttribution[] => [];
+const emptyAttributionWithName = (): ChannelAttributionWithName[] => [];
 
 const Searches = {
     CHANNEL: "channel",
@@ -50,8 +51,8 @@ function Find() {
         creator: SystemProgram.programId,
         subscriptionMint: SystemProgram.programId
     })
-    const [subscriptionsForWallet, setSubscriptionsForWallet] = useState(emptyAttribution());
-    const [createdChannelsForWallet, setCreatedChannelsForWallet] = useState(emptyAttribution());
+    const [subscriptionsForWallet, setSubscriptionsForWallet] = useState(emptyAttributionWithName());
+    const [createdChannelsForWallet, setCreatedChannelsForWallet] = useState(emptyAttributionWithName());
     const [channelPrivilege, setChannelPrivilege] = useState(Privilege.NONE);
 
     const handleSearchChange = (text: string) => {
@@ -73,15 +74,16 @@ function Find() {
     }
 
     const seeExample = () => {
-        const channel5 = "Channel 5";
+        const channel5 = "Channel5";
         history.push("?key=" + channel5);
+        setSearchText(channel5);
         search(channel5);
     }
 
     const search = async (searchText: string) => {
         try {
             let publicKey = new PublicKey(searchText);
-            let newAttribution = await fetchChannelAttributionByMint(publicKey, connection);
+            let newAttribution = await fetchChannelAttributionBySubscription(publicKey, connection);
             if (newAttribution) {
                 setSearchStatus(Searches.CHANNEL);
                 setChannelAttribution(newAttribution)
@@ -91,11 +93,11 @@ function Find() {
                 console.log("search is wallet");
                 fetchCreatedChannelsForWallet(publicKey, connection).then((createdChannels) => {
                     setCreatedChannelsForWallet(createdChannels);
-                    console.log(createdChannels);
+                    console.log("created ", createdChannels);
                 });
                 fetchSubscriptionsForWallet(publicKey, connection).then((subscriptions) => {
                     setSubscriptionsForWallet(subscriptions);
-                    console.log(subscriptions);
+                    console.log("subscriptions ", subscriptions);
                 });
             }
         } catch { //search with the name string
@@ -185,13 +187,16 @@ function Find() {
                 setSubscriptionsForWallet(subscriptions);
             });
         } else {
-            setSubscriptionsForWallet(emptyAttribution());
+            setSubscriptionsForWallet(emptyAttributionWithName());
         }
     }, [channelAttribution.subscriptionMint, wallet.connected, wallet.publicKey])
 
-    const clickedChannel = () => {
-
+    const clickedChannel = (name: string) => {
+        history.push("?key=" + name);
+        search(name);
+        setSearchText(name);
     }
+    //for example i could show all of your friends that are subscribers
 
     //im gonna do an example that's just channel 5
     let infoCards = null;
@@ -214,7 +219,7 @@ function Find() {
         default:
             infoCards = (
                 <div>
-                    <button onClick={seeExample}>see an example</button>
+                    <button onClick={seeExample} className="channel-example">see an example</button>
                 </div>
             )
     }
@@ -222,7 +227,7 @@ function Find() {
         <div className="component-parent">
             <div className="component-header">Find a Channel</div>
             <SearchBar handleSearchChange={handleSearchChange} searchText={searchText} didPressSearch={didPressSearch} />
-            <button className="default-button search" onClick={didPressSearch}>search</button>
+            <button className="button search" onClick={didPressSearch}>search</button>
             {infoCards}
         </div>
     );
