@@ -26,8 +26,8 @@ function ChannelInteractiveCard(props: Props) {
     if (props.privilege === "edit") {
         body = (
             <div>
-                <div>u created this channel</div>
-                <div>(edit/transfer ownership coming soon)</div>
+                <div className="creator">u created this channel. nice</div>
+                <div>(edit metadata/transfer ownership coming soon)</div>
             </div>
         );
     } else if (props.privilege === "subscribe") {
@@ -37,7 +37,7 @@ function ChannelInteractiveCard(props: Props) {
     } else if (props.privilege === "subscribed") {
         //should do button with check or someth
         body = (
-            <div>you are a subscriber</div>
+            <div className="subscriber">u subscribed &#10003;</div>
         )
     } else {
         body = (

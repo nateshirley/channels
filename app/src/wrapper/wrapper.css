@@ -20,8 +20,8 @@
 }
 
 .logo {
-  width: 70px;
-  height: 70px;
+  width: 127px;
+  height: 80px;
 }
 
 .connect {
@@ -31,4 +31,10 @@
 
 .tester {
   font-family: "Quicksand", sans-serif;
+}
+
+.navbar {
+  height: 100px;
+  margin-left: 40px;
+  margin-right: 40px;
 }

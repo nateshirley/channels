@@ -17,7 +17,7 @@ function SearchBar(props: SearchBarProps) {
 
     return (
         <input
-            placeholder="search wallet or pack mint"
+            placeholder="search channel name or wallet address"
             onChange={e => props.handleSearchChange(e.target.value)}
             onKeyPress={keyPress}
             value={props.searchText}

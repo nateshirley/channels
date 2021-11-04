@@ -17,7 +17,7 @@ const NavigationBar: FC = () => {
     }
 
     return (
-        <nav>
+        <nav className="navbar">
             <Link to="/"><img src={logo} alt="home" className="logo" /></Link>
             <div >
                 {/* <Link to="/make">+make</Link> */}
