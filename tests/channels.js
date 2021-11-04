@@ -85,6 +85,13 @@ describe("channels", () => {
     let [_subscriptionMetadata, _subscriptionMetadataBump] =
       await getMetadataAddress(subscription.publicKey);
 
+    let [_nameTest, _nameTestBump] =
+      await PublicKey.findProgramAddress(
+        [
+          anchor.utils.bytes.utf8.encode("channel"),
+        ],
+        program.programId
+      );
 
     mintAuth = _mintAuth;
     const metadataInputs = {
@@ -112,6 +119,7 @@ describe("channels", () => {
           tokenProgram: TOKEN_PROGRAM_ID,
           tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
           rent: SYSVAR_RENT_PUBKEY,
+          nameTest: _nameTest,
         },
         instructions: [
           //create subscription mint account
@@ -137,6 +145,12 @@ describe("channels", () => {
     );
     console.log("create signature", ctx);
 
+    let rawTestAttribution = await provider.connection.getAccountInfo(
+      _nameTest
+    );
+    console.log(rawTestAttribution)
+    //can access same way as i did with the likes
+
     let rawSubAttribution = await provider.connection.getAccountInfo(
       _subscriptionAttribution
     );
@@ -153,12 +167,36 @@ describe("channels", () => {
     let rawNameAttribution = await provider.connection.getAccountInfo(
       _nameAttribution
     );
+    //console.log(rawNameAttribution)
+
     let nameAttributionDecoded = ChannelAttributionLayout.decode(
       rawNameAttribution.data
     );
-    console.log(nameAttributionDecoded);
+    //console.log(nameAttributionDecoded);
   });
 
+  // it("test the string", async () => {
+  //   let [_nameTest, _nameTestBump] =
+  //     await PublicKey.findProgramAddress(
+  //       [
+  //         anchor.utils.bytes.utf8.encode("channel"),
+  //       ],
+  //       program.programId
+  //     );
+
+  //   let tx = await program.rpc.stringTest(_nameTestBump, {
+  //     accounts: {
+  //       creator: creator.publicKey,
+  //       nameTest: _nameTest,
+  //       systemProgram: SystemProgram.programId
+  //     },
+  //     signers: [
+  //       creator
+  //     ]
+  //   })
+  //   console.log(program.account.nameTest.size);
+
+  // })
 
   it("subscribe to a channel", async () => {
     let subscriberTokenAccount = await getAssociatedTokenAccountAddress(

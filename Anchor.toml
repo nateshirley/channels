@@ -5,7 +5,7 @@ channels = "4awF9VKqak7dFcLaCFsvegkHqDH9CWxJL8ghDbwUGq7w"
 url = "https://anchor.projectserum.com"
 
 [provider]
-cluster = "https://lingering-lingering-mountain.solana-devnet.quiknode.pro/fbbd36836095686bd9f580212e675aaab88204c9/"
+cluster = "localnet"
 wallet = "/Users/nathanshirley/.config/solana/id.json"
 
 [scripts]

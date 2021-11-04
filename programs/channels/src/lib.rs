@@ -23,7 +23,6 @@ pub mod channels {
         uri: String,
     ) -> ProgramResult {
         let seeds = &[&MINT_AUTH_SEED[..], &[_mint_auth_bump]];
-
         //set data for mint attribution
         ctx.accounts.subscription_attribution.creator = ctx.accounts.creator.key();
         ctx.accounts.subscription_attribution.subscription_mint =
@@ -35,34 +34,36 @@ pub mod channels {
         ctx.accounts.name_attribution.subscription_mint = ctx.accounts.subscription_mint.key();
         ctx.accounts.name_attribution.from_name = true;
 
-        let creators = vec![spl_token_metadata::state::Creator {
-            address: ctx.accounts.mint_auth.key(),
-            verified: true,
-            share: 100,
-        }];
-        // //create subscription metadata
-        anchor_token_metadata::create_metadata(
-            ctx.accounts
-                .into_create_subscription_metadata_context()
-                .with_signer(&[&seeds[..]]),
-            name,
-            symbol,
-            uri,
-            Some(creators),
-            0,
-            true,
-            true,
-        )?;
+        //16 chars, each with a u8, that means 16 bytes
+        ctx.accounts.name_test.name = String::from("kobekobekobekobe");
+        // let creators = vec![spl_token_metae.cldata::state::Creator {
+        //     address: ctx.accounts.mint_auth.key(),
+        //     verified: true,
+        //     share: 100,
+        // }];
+        // // //create subscription metadata
+        // anchor_token_metadata::create_metadata(
+        //     ctx.accounts
+        //         .into_create_subscription_metadata_context()
+        //         .with_signer(&[&seeds[..]]),
+        //     name,
+        //     symbol,
+        //     uri,
+        //     Some(creators),
+        //     0,
+        //     true,
+        //     true,
+        // )?;
 
-        // //mark w/ primary sale happened to avoid confusion on seller fees
-        anchor_token_metadata::update_metadata(
-            ctx.accounts
-                .into_update_subscription_metadata_context()
-                .with_signer(&[&seeds[..]]),
-            None,
-            None,
-            Some(true),
-        )?;
+        // // //mark w/ primary sale happened to avoid confusion on seller fees
+        // anchor_token_metadata::update_metadata(
+        //     ctx.accounts
+        //         .into_update_subscription_metadata_context()
+        //         .with_signer(&[&seeds[..]]),
+        //     None,
+        //     None,
+        //     Some(true),
+        // )?;
 
         Ok(())
     }
@@ -85,20 +86,25 @@ pub mod channels {
     ) -> ProgramResult {
         let seeds = &[&MINT_AUTH_SEED[..], &[_mint_auth_bump]];
 
-        let existing_metadata: spl_token_metadata::state::Metadata =
-            try_from_slice_unchecked(&ctx.accounts.subscription_metadata.data.borrow()).unwrap();
-        let mut new_data: spl_token_metadata::state::Data = existing_metadata.data;
-        new_data.uri = uri;
+        // let existing_metadata: spl_token_metadata::state::Metadata =
+        //     try_from_slice_unchecked(&ctx.accounts.subscription_metadata.data.borrow()).unwrap();
+        // let mut new_data: spl_token_metadata::state::Data = existing_metadata.data;
+        // new_data.uri = uri;
 
-        anchor_token_metadata::update_metadata(
-            ctx.accounts
-                .into_update_subscription_metadata_context()
-                .with_signer(&[&seeds[..]]),
-            None,
-            Some(new_data),
-            None,
-        )?;
+        // anchor_token_metadata::update_metadata(
+        //     ctx.accounts
+        //         .into_update_subscription_metadata_context()
+        //         .with_signer(&[&seeds[..]]),
+        //     None,
+        //     Some(new_data),
+        //     None,
+        // )?;
 
+        Ok(())
+    }
+
+    pub fn string_test(ctx: Context<StringTest>, _name_test_bump: u8) -> ProgramResult {
+        ctx.accounts.name_test.name = String::from("JJJJJJJ");
         Ok(())
     }
 }
@@ -143,15 +149,62 @@ pub struct CreateChannel<'info> {
     #[account(address = spl_token_metadata::id())]
     token_metadata_program: AccountInfo<'info>,
     pub rent: Sysvar<'info, Rent>,
+    #[account(
+        init,
+        seeds = [CHANNEL_ATTRIBUTION_SEED],
+        bump,
+        payer = creator.to_account_info(),
+        space = 60,
+    )]
+    pub name_test: Account<'info, NameTest>,
 }
-
-//8 + 32 + 32 = 72 bytes
+//it adds 4 bytes if u put a string in it
+//8 + 32 + 32 = 72 byte
 #[account]
 #[derive(Default)]
 pub struct ChannelAttribution {
     pub creator: Pubkey,
     pub subscription_mint: Pubkey,
     pub from_name: bool,
+}
+
+//8+32+16 = 56 (plus 4 idk)
+#[derive(Accounts)]
+#[instruction(_name_test_bump: u8)]
+pub struct StringTest<'info> {
+    pub creator: Signer<'info>,
+    #[account(
+        init,
+        seeds = [CHANNEL_ATTRIBUTION_SEED],
+        bump,
+        payer = creator.to_account_info()
+    )]
+    pub name_test: Account<'info, NameTest>,
+    pub system_program: Program<'info, System>,
+}
+// #[account(
+//     init,
+//     payer = creator.to_account_info()
+// )]
+// pub name_test: Account<'info, NameTest>,
+#[account]
+#[derive(Default)]
+pub struct NameTest {
+    pub creator: Pubkey,
+    pub name: String,
+}
+// impl Default for NameTest {
+//     fn default() -> NameTest {
+//         NameTest {
+//             creator: Pubkey::new_unique(),
+//             name: String::from("biiiiiiiiii im back"),
+//         }
+//     }
+// }
+
+#[derive(Default, Clone, AnchorDeserialize, AnchorSerialize, Debug)]
+pub struct Name {
+    pub text: String,
 }
 
 #[derive(Accounts)]
