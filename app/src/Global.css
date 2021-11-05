@@ -16,6 +16,12 @@
   margin-bottom: 30px;
 }
 
+.wrapper-parent {
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(179.97deg, #abb3ff 26.76%, #ffb3d7 99.76%);
+}
+
 .home-logo {
   margin-left: auto;
   margin-right: auto;
@@ -25,9 +31,9 @@
 }
 
 .home-info {
-  font-size: 22px;
+  font-size: 18px;
   text-align: center;
-  font-weight: 600;
+  font-weight: 500;
   width: 100%;
   margin-top: 5px;
 }
@@ -44,12 +50,13 @@
   margin-top: 35px;
 }
 .button.home {
-  width: 163px;
-  height: 55px;
-  line-height: 47px;
+  width: 180px;
+  height: 65px;
+  line-height: 58px;
   border-radius: 10px;
   text-decoration: none;
-  font-size: 16px;
+  font-size: 18px;
+  font-weight: 800;
   margin-top: 5px;
 }
 .button.home:hover {
@@ -78,7 +85,7 @@
 .home-body {
   margin-top: 14px;
   padding: 26px 30px 26px 30px;
-  background-color: #d9ddff;
+  background-color: #f9e3ff;
   border-radius: 10px;
   font-weight: 500;
 }

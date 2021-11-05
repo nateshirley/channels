@@ -40,8 +40,10 @@ const WalletWrapper: FC = () => {
         <ConnectionProvider endpoint={endpoint}>
             <WalletProvider wallets={wallets} onError={onError} autoConnect>
                 <WalletModalProvider>
-                    <NavigationBar />
-                    <ComponentSwitch />
+                    <div className="wrapper-parent">
+                        <NavigationBar />
+                        <ComponentSwitch />
+                    </div>
                 </WalletModalProvider>
                 <Toaster position="bottom-left" reverseOrder={false} />
             </WalletProvider>
