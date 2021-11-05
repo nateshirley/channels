@@ -12,8 +12,8 @@ const NavigationBar: FC = () => {
         color: "black",
         backgroundColor: "white",
         border: '2px solid rgba(0, 0, 0, 1)',
-        fontFamily: "Quicksand",
-        fontWeight: 800
+        fontFamily: "IBM Plex Sans",
+        fontWeight: 600
     }
 
     return (
