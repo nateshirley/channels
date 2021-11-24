@@ -100,7 +100,7 @@ function Find() {
                     console.log("subscriptions ", subscriptions);
                 });
             }
-        } catch { //search with the name string
+        } catch (e) { //search with the name string
             let newAttribution = await fetchChannelAttributionByName(searchText, connection);
             if (newAttribution) {
                 setSearchStatus(Searches.CHANNEL);
