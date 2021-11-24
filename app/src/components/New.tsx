@@ -113,9 +113,9 @@ function New() {
 
     let air = null;
     if (didAirdrop === 0) {
-        air = (<button className="airdrop" onClick={requestAirdrop}>(airdrop me devnet sol)</button>);
+        air = (<button className="airdrop" onClick={requestAirdrop}>(get devnet sol)</button>);
     } else if (didAirdrop === 1) {
-        air = <div className="airdrop">processing tx...</div>;
+        air = <div className="airdrop">airdropping...</div>;
     } else {
         air = <div className="airdrop">successful airdrop</div>;
     }
