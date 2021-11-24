@@ -3,13 +3,13 @@ import { Provider } from '@project-serum/anchor';
 import React, { useEffect, useState, useCallback } from "react";
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useHistory } from "react-router-dom";
-import { PublicKey, SystemProgram, Keypair, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
+import { PublicKey, SystemProgram, Keypair, SYSVAR_RENT_PUBKEY, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { Program } from '@project-serum/anchor';
 import idl from '../idl.json';
 import { css } from "@emotion/react";
 import MoonLoader from "react-spinners/MoonLoader";
 import { createChannel, } from '../modules/newChannels'
-import { getProvider } from '../modules/utils'
+import { getAirdropProvider, getProvider } from '../modules/utils'
 
 
 const override = css`
@@ -25,6 +25,7 @@ function New() {
     const [showSpaceError, setShowSpaceError] = useState(false);
     const wallet = useWallet();
     const history = useHistory();
+    const [didAirdrop, setDidAirdrop] = useState(0);
 
 
     const didPressCreateChannel = async () => {
@@ -50,6 +51,21 @@ function New() {
             setShowSpaceError(true);
         } else {
             setShowSpaceError(false);
+        }
+    }
+
+    const requestAirdrop = async () => {
+        setDidAirdrop(1);
+        if (wallet.publicKey) {
+            let provider = getAirdropProvider(wallet);
+            await provider.connection.confirmTransaction(
+                await provider.connection.requestAirdrop(
+                    wallet.publicKey,
+                    1 * LAMPORTS_PER_SOL
+                ),
+                "confirmed"
+            );
+            setDidAirdrop(2);
         }
     }
 
@@ -95,10 +111,20 @@ function New() {
         )
     }
 
+    let air = null;
+    if (didAirdrop === 0) {
+        air = (<button className="airdrop" onClick={requestAirdrop}>(airdrop me devnet sol)</button>);
+    } else if (didAirdrop === 1) {
+        air = <div className="airdrop">processing tx...</div>;
+    } else {
+        air = <div className="airdrop">successful airdrop</div>;
+    }
+
     return (
         <div className="component-parent">
             <div className="component-header">New Channel</div>
             {body}
+            {air}
         </div>
     );
 }

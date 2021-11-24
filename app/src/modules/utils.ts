@@ -5,6 +5,7 @@ import {
   TransactionInstruction,
   Connection,
   Commitment,
+  clusterApiUrl,
 } from "@solana/web3.js";
 import { Provider } from "@project-serum/anchor";
 import { WalletContextState } from "@solana/wallet-adapter-react";
@@ -39,6 +40,20 @@ export const getProvider = (withWallet: WalletContextState) => {
   let wallet: any = withWallet;
   const provider = new Provider(getConnection(), wallet, confirmOptions);
   return provider;
+};
+
+export const getAirdropProvider = (withWallet: WalletContextState) => {
+  const commitment: Commitment = "processed";
+  let confirmOptions = { preflightCommitment: commitment };
+  let wallet: any = withWallet;
+  const provider = new Provider(getAirdropConnection(), wallet, confirmOptions);
+  return provider;
+};
+
+export const getAirdropConnection = () => {
+  const network = clusterApiUrl("devnet");
+  const commitment: Commitment = "processed";
+  return new Connection(network, commitment);
 };
 
 export const getConnection = () => {
