@@ -16,13 +16,19 @@ function Home() {
                 </div>
                 <div className="home-subheader">Wait, what?</div>
                 <div className="home-body">
-                    Channels link their creator's wallet to a unique channel token. Once a channel is created, anyone can subscribe by minting its token.
+                    Channels is an on-chain friend graph for Solana.
+                    <br />
+                    <br />
+                    Every channel has a unique name that connects its creator to a token. Once a channel is created, anyone can subscribe by minting its token.
                     <br />
                     <br />
                     Channel tokens represent connections to their creator. If you hold the channel's token, you're subscribed to its creator.
                     <br />
                     <br />
-                    When wallet relationships are on chain, we can take them wherever we go.
+                    This makes it easy to subscribe to friends’ wallets or build an audience of your own. And since everything is on-chain, any app can find the wallets you’ve subscribed to and use them to make their product cooler. For example, to show you some of your friends' transactions.
+                    <br />
+                    <br />
+                    When your friends are on-chain, you can take them wherever you go…
                 </div>
             </div>
         </div>
